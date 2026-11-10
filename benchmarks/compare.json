@@ -1,0 +1,60 @@
+[
+ {
+  "mode": "fixed",
+  "start_config": "F16/t4/b512",
+  "end_to_end_tok_s": 43.5,
+  "median_decode_tok_s": 45.2,
+  "median_decode_tok_s_2nd_half": 45.1,
+  "reloads": 0,
+  "reload_time_s": 0.0,
+  "total_wall_s": 55.6,
+  "configs_used": {
+   "F16/t4/b512/g0": 30
+  },
+  "learning": null
+ },
+ {
+  "mode": "rl+background",
+  "start_config": "F16/t4/b512",
+  "end_to_end_tok_s": 68.2,
+  "median_decode_tok_s": 75.7,
+  "median_decode_tok_s_2nd_half": 101.5,
+  "reloads": 29,
+  "reload_time_s": 0.0,
+  "total_wall_s": 37.1,
+  "configs_used": {
+   "F16/t4/b512/g0": 4,
+   "Q8_0/t4/b512/g0": 16,
+   "Q8_0/t8/b512/g0": 1,
+   "Q8_0/t2/b512/g0": 1,
+   "Q4_0/t4/b512/g0": 8
+  },
+  "learning": {
+   "model": "Smollm2 360M 8k Lc100K Mix1 Ep2",
+   "context": "65d3f915d9579e82a680784e23171589",
+   "episodes": 30,
+   "epsilon": 0.0322,
+   "q_states": 8,
+   "mean_reward_early": 0.5754,
+   "mean_reward_recent": 0.7453,
+   "blacklisted_configs": 0,
+   "top_configs": [
+    {
+     "mean_reward": 0.8872,
+     "samples": 8,
+     "config": "{\"flash_attn\":false,\"kv_type\":\"f16\",\"model_path\":\"C:\\\\Users\\\\sripa\\\\.ollama\\\\models\\\\blobs\\\\sha256-bf1175858f575d8c096dee60d7c1fbd2dae996ff8bb2e068afe11360a2696a2f\",\"n_batch\":512,\"n_ctx\":2048,\"n_gpu_layers\":0,\"n_threads\":4,\"precision\":\"Q4_0\"}"
+    },
+    {
+     "mean_reward": 0.6922,
+     "samples": 16,
+     "config": "{\"flash_attn\":false,\"kv_type\":\"f16\",\"model_path\":\"C:\\\\Users\\\\sripa\\\\.ollama\\\\models\\\\blobs\\\\sha256-48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201\",\"n_batch\":512,\"n_ctx\":2048,\"n_gpu_layers\":0,\"n_threads\":4,\"precision\":\"Q8_0\"}"
+    },
+    {
+     "mean_reward": 0.6009,
+     "samples": 1,
+     "config": "{\"flash_attn\":false,\"kv_type\":\"f16\",\"model_path\":\"C:\\\\Users\\\\sripa\\\\.ollama\\\\models\\\\blobs\\\\sha256-48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201\",\"n_batch\":512,\"n_ctx\":2048,\"n_gpu_layers\":0,\"n_threads\":8,\"precision\":\"Q8_0\"}"
+    }
+   ]
+  }
+ }
+]

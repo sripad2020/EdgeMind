@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EdgeMind — Adaptive Intelligence Runtime</title>
+  <meta name="description" content="EdgeMind runs any open AI model on the device you already have: it checks the hardware, picks the fastest safe setup, protects the device and keeps improving while it works.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* Light theme (default): soft neutrals with a calm navy accent */
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #f1f3f6;
+      --surface-3: #e7eaef;
+      --border: #e3e6eb;
+      --border-strong: #d3d8e0;
+      --text: #2b3240;
+      --text-strong: #121826;
+      --muted: #5f6878;
+      --faint: #8a93a3;
+      --accent: #3d5f8f;        /* muted navy */
+      --accent-soft: #eef3fa;
+      --accent-border: #d6e0ef;
+      --good: #2f7a62;          /* muted green */
+      --good-soft: #f1f8f5;
+      --good-border: #d5e9e1;
+      --bad: #a5524a;           /* muted red */
+      --bad-soft: #fcf3f2;
+      --bad-border: #f0dcd9;
+      --warn: #9a7432;
+      --nav-bg: rgba(246, 247, 249, .9);
+      --shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 4px 14px rgba(17, 24, 39, .04);
+      --radius: 12px;
+      --code-bg: #f4f6f9;
+      --code-kw: #3d5f8f;
+      --code-str: #2f7a62;
+      --code-com: #8a93a3;
+      --code-fn: #8a5a2b;
+      --scene-bg: #eef1f5;
+    }
+    /* Dark theme (toggle in the top bar) */
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0d0f13;
+      --surface: #14171d;
+      --surface-2: #1a1e26;
+      --surface-3: #222733;
+      --border: #262c38;
+      --border-strong: #323949;
+      --text: #d6dae2;
+      --text-strong: #eef0f4;
+      --muted: #8c94a3;
+      --faint: #646c7b;
+      --accent: #8aa6cc;
+      --accent-soft: #18202e;
+      --accent-border: #26324a;
+      --good: #74ad99;
+      --good-soft: #131d1a;
+      --good-border: #1e2f29;
+      --bad: #bd817a;
+      --bad-soft: #1e1514;
+      --bad-border: #33221f;
+      --warn: #bfa16a;
+      --nav-bg: rgba(13, 15, 19, .88);
+      --shadow: none;
+      --code-bg: #101318;
+      --code-kw: #8aa6cc;
+      --code-str: #74ad99;
+      --code-com: #646c7b;
+      --code-fn: #c9a36b;
+      --scene-bg: #11141a;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15.5px/1.65 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+    section { padding: 76px 0; border-top: 1px solid var(--border); }
+    h1, h2, h3, h4 { margin: 0; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.01em; }
+    h2 { font-size: clamp(24px, 3vw, 32px); font-weight: 700; }
+    h3 { font-size: 17px; font-weight: 650; }
+    h4 { font-size: 14px; font-weight: 650; }
+    p { margin: 0; }
+    .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .lead { color: var(--muted); font-size: 17px; max-width: 760px; margin-top: 12px; }
+    .head { margin-bottom: 34px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+
+    /* nav */
+    nav { position: sticky; top: 0; z-index: 20; background: var(--nav-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .nav-right { display: flex; align-items: center; gap: 22px; }
+    .theme-btn { font: inherit; font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+    .theme-btn:hover { color: var(--text-strong); }
+    .card, .stat, .group, .tl, .flow { box-shadow: var(--shadow); }
+    nav .wrap { height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text-strong); font-size: 17px; }
+    .logo { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface-2); display: grid; place-items: center; color: var(--accent); font-size: 12px; }
+    .links { display: flex; gap: 22px; font-size: 14px; }
+    .links a { color: var(--muted); }
+    .links a:hover { color: var(--text-strong); }
+
+    /* hero */
+    .hero { padding: 92px 0 72px; border-top: none; }
+    .hero h1 { font-size: clamp(34px, 5.4vw, 56px); font-weight: 800; max-width: 880px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero .lead { font-size: clamp(16px, 1.8vw, 19px); }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .badge { font-size: 13px; color: var(--muted); border: 1px solid var(--border-strong); background: var(--surface); padding: 6px 12px; border-radius: 999px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 48px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 18px 16px; }
+    .stat b { display: block; font-size: 28px; font-weight: 750; color: var(--text-strong); }
+    .stat span { font-size: 13.5px; color: var(--muted); }
+
+    /* generic */
+    .grid { display: grid; gap: 14px; }
+    .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+    .card p { color: var(--muted); margin-top: 8px; font-size: 14.5px; }
+
+    /* how it works flow */
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .flow .stage { padding: 22px 18px; background: var(--surface); border-right: 1px solid var(--border); position: relative; }
+    .flow .stage:last-child { border-right: none; }
+    .flow .n { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .08em; }
+    .flow h3 { margin-top: 6px; }
+    .flow p { color: var(--muted); font-size: 14px; margin-top: 8px; }
+    .flow .tech { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-strong); font-size: 12.5px; color: var(--faint); }
+    .loop-note { margin-top: 14px; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .loop-note span { color: var(--accent); }
+
+    /* compare */
+    .compare-head { display: grid; grid-template-columns: 200px 1fr 1fr; gap: 14px; margin-bottom: 10px; }
+    .compare-head div { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .compare-head .without { color: var(--bad); }
+    .compare-head .with { color: var(--good); }
+    .row { display: grid; grid-template-columns: 200px 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+    .row .when { padding: 18px 4px; }
+    .row .when h4 { font-size: 15px; }
+    .row .when span { display: block; font-size: 12.5px; color: var(--faint); margin-top: 4px; }
+    .side { border-radius: var(--radius); padding: 16px 18px; border: 1px solid var(--border); font-size: 14px; }
+    .side.without { background: var(--bad-soft); border-color: var(--bad-border); }
+    .side.with { background: var(--good-soft); border-color: var(--good-border); }
+    .side b { display: block; color: var(--text-strong); font-weight: 600; margin-bottom: 4px; }
+    .side p { color: var(--muted); }
+    .side .result { margin-top: 10px; font-size: 12.5px; font-weight: 600; }
+    .side.without .result { color: var(--bad); }
+    .side.with .result { color: var(--good); }
+
+    /* measured */
+    .bars { display: grid; gap: 12px; margin-top: 16px; }
+    .bar-row { display: grid; grid-template-columns: 150px 1fr 76px; gap: 12px; align-items: center; font-size: 13.5px; }
+    .bar-row .lbl { color: var(--muted); }
+    .track { height: 10px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; border-radius: 999px; background: var(--faint); }
+    .fill.good { background: var(--good); }
+    .fill.acc { background: var(--accent); }
+    .bar-row .v { text-align: right; font-weight: 650; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+    .metric b { display: block; font-size: 26px; font-weight: 750; color: var(--text-strong); }
+    .metric span { display: block; font-size: 13.5px; font-weight: 600; margin-top: 2px; }
+    .metric p { font-size: 13px; }
+
+    /* does list */
+    .does { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; }
+    .group h3 { display: flex; align-items: center; gap: 10px; }
+    .group h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+    .group ul { list-style: none; margin: 14px 0 0; padding: 0; }
+    .group li { position: relative; padding: 7px 0 7px 22px; font-size: 14px; color: var(--muted); border-top: 1px solid var(--border); }
+    .group li:first-child { border-top: none; }
+    .group li::before { content: "✓"; position: absolute; left: 0; top: 7px; color: var(--good); font-size: 13px; }
+    .group li b { color: var(--text); font-weight: 600; }
+
+    /* implementation */
+    .paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .path .tag { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-border); padding: 3px 9px; border-radius: 999px; margin-bottom: 12px; }
+    .path ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+    .path li { margin: 4px 0; }
+    .timeline { margin-top: 18px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; counter-reset: s; }
+    .tl { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; position: relative; }
+    .tl::before { counter-increment: s; content: "0" counter(s); display: block; font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .08em; margin-bottom: 8px; }
+    .tl p { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+    .tl .out { margin-top: 10px; font-size: 12.5px; color: var(--good); }
+    .req { margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .req .card h4 { color: var(--muted); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+    .req .card p { color: var(--text); font-size: 14.5px; margin-top: 6px; }
+
+    /* objective */
+    .objective { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+    .obj { border-left: 2px solid var(--accent); padding: 4px 0 4px 14px; }
+    .obj b { display: block; color: var(--text-strong); font-size: 15px; }
+    .obj span { display: block; color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+
+    /* buttons */
+    .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-strong); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+    .btn:hover { filter: brightness(1.05); }
+    .btn svg { width: 16px; height: 16px; fill: currentColor; }
+    .gh-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 12px; background: var(--surface); }
+    .gh-link:hover { color: var(--text-strong); }
+    .gh-link svg { width: 14px; height: 14px; fill: currentColor; }
+
+    /* 3D scene */
+    .scene-wrap { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--scene-bg); overflow: hidden; box-shadow: var(--shadow); }
+    #scene { display: block; width: 100%; height: 460px; }
+    .scene-caption { position: absolute; left: 16px; top: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; pointer-events: none; }
+    .stage-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; max-width: 460px; box-shadow: var(--shadow); }
+    .stage-pill .k { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+    .stage-pill .t { font-size: 14px; color: var(--text-strong); margin-top: 2px; font-weight: 600; }
+    .stage-pill .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .legend { position: absolute; left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .scene-fallback { display: none; padding: 60px 20px; text-align: center; color: var(--muted); }
+    .scene-wrap.no-webgl #scene { display: none; }
+    .scene-wrap.no-webgl .scene-fallback { display: block; }
+    .scene-notes { margin-top: 14px; }
+    .scene-notes .card h4 { font-size: 13px; }
+    .scene-notes .card p { font-size: 13.5px; }
+
+    /* code */
+    .code-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .code-tab { font: inherit; font-size: 13px; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+    .code-tab[aria-selected="true"] { color: var(--text-strong); border-color: var(--accent-border); background: var(--accent-soft); }
+    .code-panel { display: none; }
+    .code-panel.active { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; }
+    .code-box { border: 1px solid var(--border); border-radius: var(--radius); background: var(--code-bg); overflow: hidden; box-shadow: var(--shadow); }
+    .code-box .file { font-size: 12px; color: var(--faint); padding: 8px 14px; border-bottom: 1px solid var(--border); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { margin: 0; padding: 16px 18px; overflow-x: auto; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text); }
+    pre .kw { color: var(--code-kw); font-weight: 600; }
+    pre .s { color: var(--code-str); }
+    pre .c { color: var(--code-com); font-style: italic; }
+    pre .f { color: var(--code-fn); }
+    .code-explain h4 { font-size: 15px; }
+    .code-explain p { color: var(--muted); font-size: 14px; margin-top: 8px; }
+    .code-explain .meta { margin-top: 12px; font-size: 12.5px; color: var(--faint); }
+
+    footer { border-top: 1px solid var(--border); padding: 30px 0 44px; font-size: 13px; color: var(--faint); }
+    footer .wrap { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+
+    @media (max-width: 980px) {
+      .links { display: none; }
+      .stats, .g4, .req { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow { grid-template-columns: 1fr; }
+      .flow .stage { border-right: none; border-bottom: 1px solid var(--border); }
+      .flow .stage:last-child { border-bottom: none; }
+      .does, .paths, .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .timeline, .objective { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .compare-head { display: none; }
+      .row { grid-template-columns: 1fr; gap: 8px; margin-bottom: 22px; }
+      .row .when { padding: 0; }
+      .side.without::before { content: "Normal device"; display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--bad); margin-bottom: 6px; }
+      .side.with::before { content: "With EdgeMind"; display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--good); margin-bottom: 6px; }
+    }
+    @media (max-width: 620px) {
+      section { padding: 54px 0; }
+      .hero { padding: 60px 0 48px; }
+      .stats, .g2, .g3, .g4, .does, .paths, .timeline, .req, .objective { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 100px 1fr 60px; font-size: 12.5px; }
+      #scene { height: 340px; }
+      .stage-pill { max-width: none; }
+      .legend { display: none; }
+    }
+    @media (max-width: 980px) {
+      .code-panel.active { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="logo">▲</span>EdgeMind</a>
+    <div class="nav-right">
+      <div class="links">
+        <a href="#see">See it work</a>
+        <a href="#how">How it works</a>
+        <a href="#compare">Normal vs EdgeMind</a>
+        <a href="#does">What it does</a>
+        <a href="#source">Source</a>
+        <a href="#implement">Implementation</a>
+      </div>
+      <a class="gh-link" href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+      <button class="theme-btn" id="theme-btn" type="button" aria-label="Switch colour theme">Dark</button>
+    </div>
+  </div>
+</nav>
+<script>
+  // Light by default; the button switches to dark. The choice is remembered when possible.
+  (function () {
+    var root = document.documentElement, btn = document.getElementById("theme-btn");
+    function apply(theme) {
+      if (theme === "dark") { root.setAttribute("data-theme", "dark"); btn.textContent = "Light"; }
+      else { root.removeAttribute("data-theme"); btn.textContent = "Dark"; }
+      document.dispatchEvent(new Event("themechange"));
+    }
+    var saved = null;
+    try { saved = localStorage.getItem("edgemind-theme"); } catch (e) { /* storage unavailable */ }
+    apply(saved === "dark" ? "dark" : "light");
+    btn.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      apply(next);
+      try { localStorage.setItem("edgemind-theme", next); } catch (e) { /* ignore */ }
+    });
+  })();
+</script>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">EdgeMind · Adaptive Intelligence Runtime SDK</div>
+    <h1>Run any AI model on the device you already have, <em>configured and improved automatically.</em></h1>
+    <p class="lead">EdgeMind sits between your application and the AI model. Before the model
+      starts, it checks the device. While the model runs, it protects the device. After every
+      reply, it learns how to run that model better on that exact machine.</p>
+    <div class="badges">
+      <span class="badge">Any open model (GGUF)</span>
+      <span class="badge">CPU or NVIDIA GPU</span>
+      <span class="badge">Runs fully on-device</span>
+      <span class="badge">Self-tuning with reinforcement learning</span>
+    </div>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>View on GitHub</a>
+      <a class="btn" href="#see">See it work in 3D</a>
+      <a class="btn" href="#source">Read the source</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>2.5×</b><span>faster replies from the first message</span></div>
+      <div class="stat"><b>−69%</b><span>model memory after automatic compression</span></div>
+      <div class="stat"><b>0</b><span>device freezes: unsafe setups are refused</span></div>
+      <div class="stat"><b>0 s</b><span>waiting while it reconfigures itself</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- 3D: SEE IT WORK -->
+<section id="see">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">See it work</div>
+      <h2>Every cube is one way to run the model</h2>
+      <p class="lead">Each cube is one setup: a model version, a CPU/GPU split, a number of
+        threads and a batch size. Watch EdgeMind map them, remove the unsafe ones, let its
+        learning agent try the safe ones, and settle on the best setup for this device.</p>
+    </div>
+    <div class="scene-wrap" id="scene-wrap">
+      <canvas id="scene" aria-label="3D animation: configuration cubes, unsafe ones filtered out, a learning agent moving to the best one"></canvas>
+      <div class="scene-fallback">The 3D view needs WebGL. Every cube would be one way to run the model; unsafe ones are filtered out, and a learning agent finds the best one.</div>
+      <div class="scene-caption">
+        <div class="stage-pill" id="stage-pill">
+          <div class="k" id="stage-k">Stage 1 · Inspect</div>
+          <div class="t" id="stage-t">Mapping every way to run the model</div>
+          <div class="d" id="stage-d">Model structure and device memory are read before anything loads.</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>safe setup</span>
+        <span><i style="background:var(--bad)"></i>unsafe (filtered out)</span>
+        <span><i style="background:var(--good)"></i>tried &amp; scored</span>
+        <span><i style="background:var(--warn)"></i>best setup</span>
+        <span><i style="background:var(--text-strong); border-radius:50%"></i>learning agent</span>
+      </div>
+    </div>
+    <div class="grid g4 scene-notes">
+      <div class="card"><h4>1 · Map</h4><p>All combinations of version, CPU/GPU split, threads and batch become candidates.</p></div>
+      <div class="card"><h4>2 · Filter</h4><p>Setups that would not fit free memory or break the quality limit turn red and are never used.</p></div>
+      <div class="card"><h4>3 · Learn</h4><p>The agent tries safe setups; each reply is scored (speed, latency, memory, quality).</p></div>
+      <div class="card"><h4>4 · Adapt</h4><p>When memory gets tight, setups are re-checked and the agent moves to a safe one.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">How the SDK works</div>
+      <h2>Five stages, every time a model runs</h2>
+      <p class="lead">The first three stages happen once, when the model is loaded. The last two
+        repeat with every reply, so the setup keeps improving.</p>
+    </div>
+    <div class="flow">
+      <div class="stage">
+        <div class="n">STAGE 1</div>
+        <h3>Inspect</h3>
+        <p>Reads the model file and measures the device before anything is loaded.</p>
+        <div class="tech">Model layers, size per layer, memory per word of conversation · CPU cores, free RAM, GPU memory</div>
+      </div>
+      <div class="stage">
+        <div class="n">STAGE 2</div>
+        <h3>Plan safely</h3>
+        <p>Lists every possible way to run the model and removes those that would not fit or would hurt quality.</p>
+        <div class="tech">Precision versions × CPU/GPU split × threads × batch, checked against free memory minus a safety reserve</div>
+      </div>
+      <div class="stage">
+        <div class="n">STAGE 3</div>
+        <h3>Start fast</h3>
+        <p>Predicts the fastest safe setup, or quickly measures each version, and starts there.</p>
+        <div class="tech">Short speed test per precision (about 5 s); compressed versions can be created automatically</div>
+      </div>
+      <div class="stage">
+        <div class="n">STAGE 4</div>
+        <h3>Run &amp; protect</h3>
+        <p>Answers requests while watching memory, temperature and speed; recovers instantly from failures.</p>
+        <div class="tech">Live telemetry, switching before memory runs out, rollback to the last working setup</div>
+      </div>
+      <div class="stage">
+        <div class="n">STAGE 5</div>
+        <h3>Learn &amp; improve</h3>
+        <p>Scores each reply and learns which setup works best on this device; prepares the next change in the background.</p>
+        <div class="tech">Reinforcement learning (Q-learning); knowledge saved per model and per device</div>
+      </div>
+    </div>
+    <div class="loop-note"><span>↻</span> Stages 4 and 5 repeat after every reply. Only <i>how</i> the model runs changes; the model's knowledge is never modified.</div>
+  </div>
+</section>
+
+<!-- NORMAL VS AIRUN -->
+<section id="compare">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Normal device vs. EdgeMind</div>
+      <h2>What actually happens, step by step</h2>
+      <p class="lead">The same laptop, the same model. On the left, the model is run the usual
+        way; on the right, through EdgeMind.</p>
+    </div>
+
+    <div class="compare-head"><div></div><div class="without">Normal device</div><div class="with">With EdgeMind</div></div>
+
+    <div class="row">
+      <div class="when"><h4>Loading the model</h4><span>Will it fit?</span></div>
+      <div class="side without"><b>Loads first, finds out later</b><p>The runtime loads the full model and reserves memory for the longest possible conversation. If RAM is short, the operating system starts swapping to disk.</p><div class="result">Risk: the device slows to a crawl or freezes</div></div>
+      <div class="side with"><b>Checks before loading</b><p>Calculates the exact memory each setup needs and compares it with free RAM minus a reserve for other programs. Setups that do not fit are never loaded, and the user is told which models do fit.</p><div class="result">Result: no freezes, clear guidance</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Choosing the version</h4><span>Full precision or compressed?</span></div>
+      <div class="side without"><b>Whatever was downloaded</b><p>The user guesses a version. Full-precision files read more memory per word, which on a CPU directly means slower replies.</p><div class="result">Typical: 44 words/s on the test laptop</div></div>
+      <div class="side with"><b>Creates, measures and picks</b><p>Builds smaller versions of the model on the device, tests the speed of each, checks how much their answers differ from the original, and starts on the best one within the quality limit.</p><div class="result">Measured: 111 words/s, 2.5× faster</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Using the hardware</h4><span>CPU, GPU, threads</span></div>
+      <div class="side without"><b>Fixed defaults</b><p>Settings are chosen once and never revisited, whether or not they suit this processor or graphics card.</p><div class="result">Hardware potential left unused</div></div>
+      <div class="side with"><b>Matched to the device</b><p>Uses the NVIDIA GPU when present, splits the model between GPU and CPU when it does not fully fit, and matches threads to the physical cores.</p><div class="result">The setup fits the machine it runs on</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Other apps need memory</h4><span>Browser, office tools…</span></div>
+      <div class="side without"><b>Competes for memory</b><p>The model keeps its full allocation; when free RAM runs out, the operating system swaps and every program, including the AI, becomes very slow.</p><div class="result">Risk: swapping, unresponsive device</div></div>
+      <div class="side with"><b>Steps aside in time</b><p>Re-checks free memory before every request and every few seconds while idle. If memory gets tight, it moves to a smaller safe setup before swapping starts.</p><div class="result">Device stays responsive</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Long conversations</h4><span>Memory for context</span></div>
+      <div class="side without"><b>Reserves the maximum up front</b><p>Memory for the longest conversation is reserved even for a two-line chat.</p><div class="result">Memory wasted most of the time</div></div>
+      <div class="side with"><b>Grows only when needed</b><p>Starts with a small conversation memory and enlarges it step by step only when a conversation gets long (tested: 1,024 → 4,096 words, automatically).</p><div class="result">Memory free for other work</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Something fails</h4><span>Out of memory, load error</span></div>
+      <div class="side without"><b>Error and manual restart</b><p>The request fails; someone has to restart the service and change settings by hand.</p><div class="result">Downtime and support effort</div></div>
+      <div class="side with"><b>Automatic recovery</b><p>Rolls back to the last working setup, retries, and still delivers the answer. The failing setup is remembered and avoided.</p><div class="result">User still gets the reply</div></div>
+    </div>
+
+    <div class="row">
+      <div class="when"><h4>Over time</h4><span>Day 2, week 2…</span></div>
+      <div class="side without"><b>Same every time</b><p>Nothing is learned; every start is the same guess.</p><div class="result">No improvement</div></div>
+      <div class="side with"><b>Gets better with use</b><p>Scores every reply on speed, response time, memory and quality, learns which setup wins on this device, and remembers it across restarts. Changes are prepared in the background, so improving costs no waiting.</p><div class="result">Measured: +57% sustained speed while learning</div></div>
+    </div>
+
+    <!-- measured -->
+    <div class="grid g2" style="margin-top:34px">
+      <div class="card">
+        <h3>Reply speed on the same laptop</h3>
+        <p>Words generated per second, CPU only (no graphics card).</p>
+        <div class="bars">
+          <div class="bar-row"><span class="lbl">Normal device</span><div class="track"><div class="fill" style="width:39%"></div></div><span class="v">44</span></div>
+          <div class="bar-row"><span class="lbl">EdgeMind, high quality</span><div class="track"><div class="fill acc" style="width:58%"></div></div><span class="v">64</span></div>
+          <div class="bar-row"><span class="lbl">EdgeMind, fastest</span><div class="track"><div class="fill good" style="width:100%"></div></div><span class="v">111</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Memory used by the model</h3>
+        <p>Same model, original vs. versions EdgeMind created on the device.</p>
+        <div class="bars">
+          <div class="bar-row"><span class="lbl">Normal device</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="v">0.68 GB</span></div>
+          <div class="bar-row"><span class="lbl">EdgeMind, high quality</span><div class="track"><div class="fill acc" style="width:53%"></div></div><span class="v">0.36 GB</span></div>
+          <div class="bar-row"><span class="lbl">EdgeMind, fastest</span><div class="track"><div class="fill good" style="width:31%"></div></div><span class="v">0.21 GB</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="card metric"><b>+57%</b><span>Sustained speed</span><p>30 replies while learning vs. a fixed setup.</p></div>
+      <div class="card metric"><b>&lt; 20 ms</b><span>SDK overhead</span><p>EdgeMind's own decision time per reply.</p></div>
+      <div class="card metric"><b>~13 s</b><span>To compress a model</span><p>Two faster versions created on the device.</p></div>
+      <div class="card metric"><b>85% / 57%</b><span>Answer agreement</span><p>High-quality / fastest version vs. original, measured.</p></div>
+    </div>
+    <p class="small muted" style="margin-top:14px">Measured on an Intel Core i5 laptop (4 cores, 16 GB RAM, no dedicated GPU) with a 360-million-parameter model. The fastest version changes answers more, so EdgeMind enforces a configurable quality limit.</p>
+  </div>
+</section>
+
+<!-- WHAT IT DOES -->
+<section id="does">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">What the SDK does</div>
+      <h2>Everything it takes care of, automatically</h2>
+    </div>
+    <div class="does">
+      <div class="group">
+        <h3><span class="dot"></span>Bring in any model</h3>
+        <ul>
+          <li><b>Model library names</b>, downloaded on request</li>
+          <li><b>HuggingFace models</b> by name or link</li>
+          <li><b>Local model files</b>, validated before use</li>
+          <li><b>Any architecture</b>: Llama, Qwen, Gemma, Mistral, Phi…</li>
+          <li><b>"Did you mean…"</b> suggestions for typos</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3><span class="dot"></span>Understand device &amp; model</h3>
+        <ul>
+          <li><b>Reads the model structure</b> without loading it</li>
+          <li><b>Detects</b> CPU cores, RAM, NVIDIA GPU</li>
+          <li><b>Calculates memory</b> for every possible setup</li>
+          <li><b>Calibrates</b> its estimates to the real device</li>
+          <li><b>Health check</b> that explains how to fix issues</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3><span class="dot"></span>Make it fast</h3>
+        <ul>
+          <li><b>Creates compressed versions</b> (high quality / fastest)</li>
+          <li><b>Speed-tests</b> each version on load</li>
+          <li><b>CPU/GPU split</b> chosen for the device</li>
+          <li><b>Threads and batch</b> matched to the processor</li>
+          <li><b>Conversation memory</b> that grows on demand</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3><span class="dot"></span>Keep quality in check</h3>
+        <ul>
+          <li><b>Measures answer quality</b> of every version</li>
+          <li><b>Quality limit</b> you can set</li>
+          <li><b>Excludes</b> versions that fall below it</li>
+          <li><b>Never alters</b> the model's knowledge</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3><span class="dot"></span>Protect the device</h3>
+        <ul>
+          <li><b>Refuses</b> setups that would not fit</li>
+          <li><b>Keeps a memory reserve</b> for other programs</li>
+          <li><b>Switches down</b> when memory gets tight</li>
+          <li><b>Automatic rollback</b> on failures</li>
+          <li><b>Remembers and avoids</b> failing setups</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3><span class="dot"></span>Learn &amp; explain</h3>
+        <ul>
+          <li><b>Learns from every reply</b> (reinforcement learning)</li>
+          <li><b>Prepares changes</b> in the background</li>
+          <li><b>Remembers</b> the best setup per device</li>
+          <li><b>Live insight</b>: speed, memory, decisions</li>
+          <li><b>Plain-language summary</b> of what it chose and why</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOURCE -->
+<section id="source">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Source code at a glance</div>
+      <h2>A few lines to use it, a clear engine underneath</h2>
+      <p class="lead">Short excerpts from the open repository. The full source, tests and examples
+        are on <a href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer">github.com/sripad2020/EdgeMind</a>.</p>
+    </div>
+
+    <div class="code-tabs" role="tablist">
+      <button class="code-tab" role="tab" aria-selected="true" data-tab="c1">Quick start</button>
+      <button class="code-tab" role="tab" aria-selected="false" data-tab="c2">Command line</button>
+      <button class="code-tab" role="tab" aria-selected="false" data-tab="c3">Safety check</button>
+      <button class="code-tab" role="tab" aria-selected="false" data-tab="c4">Learning update</button>
+      <button class="code-tab" role="tab" aria-selected="false" data-tab="c5">Reward</button>
+      <button class="code-tab" role="tab" aria-selected="false" data-tab="c6">Quantizer</button>
+    </div>
+
+    <div class="code-panel active" id="c1" role="tabpanel">
+      <div class="code-box"><div class="file">examples/01_quickstart.py</div>
+<pre><span class="kw">import</span> air_sdk
+
+<span class="c"># Any model: an Ollama name, an hf.co/... link, or a local .gguf file</span>
+<span class="kw">with</span> air_sdk.<span class="f">load</span>(<span class="s">"qwen2.5:0.5b"</span>) <span class="kw">as</span> llm:
+    <span class="f">print</span>(llm.<span class="f">ask</span>(<span class="s">"What is the capital of France?"</span>))
+
+    <span class="kw">for</span> piece <span class="kw">in</span> llm.<span class="f">stream</span>(<span class="s">"Write a two-line poem."</span>):
+        <span class="f">print</span>(piece, end=<span class="s">""</span>)
+
+    chat = llm.<span class="f">conversation</span>(system=<span class="s">"Be brief."</span>)
+    chat.<span class="f">say</span>(<span class="s">"My name is Asha."</span>)
+    <span class="f">print</span>(chat.<span class="f">say</span>(<span class="s">"What is my name?"</span>))   <span class="c"># remembers: "Asha"</span>
+
+    <span class="f">print</span>(llm.<span class="f">summary</span>())   <span class="c"># what it chose for this device, and why</span></pre></div>
+      <div class="card code-explain"><h4>One call does the setup</h4><p><b>load()</b> inspects the model and the device, filters unsafe setups, runs a quick speed test and starts on the best one. Everything after that is ordinary asking and chatting.</p><p class="meta">Options: device, goal (balanced / speed / latency / memory), quality limit, max context, download if missing.</p></div>
+    </div>
+
+    <div class="code-panel" id="c2" role="tabpanel">
+      <div class="code-box"><div class="file">terminal</div>
+<pre><span class="c"># install straight from the repository</span>
+pip install "edgemind[web] @ git+https://github.com/sripad2020/EdgeMind"
+
+air-sdk doctor                 <span class="c"># is this device ready? how to fix what is missing</span>
+air-sdk models                 <span class="c"># installed models, and which fit in memory now</span>
+air-sdk pull llama3.2:1b       <span class="c"># or any hf.co/&lt;user&gt;/&lt;repo&gt; GGUF</span>
+air-sdk chat qwen2.5:0.5b      <span class="c"># interactive chat (/summary /reset /bye)</span>
+air-sdk faster smollm2:360m    <span class="c"># create Q8_0 / Q4_0 versions + measure quality</span>
+air-sdk web --port 8000        <span class="c"># private chat portal in the browser</span></pre></div>
+      <div class="card code-explain"><h4>No code needed for IT teams</h4><p>The same engine as a command-line tool: check devices, roll out models, compress them and benchmark, with readable output and exit codes for scripts.</p><p class="meta">Every error ends with a "How to fix" line.</p></div>
+    </div>
+
+    <div class="code-panel" id="c3" role="tabpanel">
+      <div class="code-box"><div class="file">air_sdk/engines/space.py</div>
+<pre><span class="kw">def</span> <span class="f">check</span>(self, pos, budget, blacklist) -&gt; Rejection | <span class="kw">None</span>:
+    <span class="s">"""Deterministic safety rules. Returns None if safe. O(1)."""</span>
+    <span class="kw">if not</span> self.<span class="f">in_range</span>(pos):
+        <span class="kw">return</span> Rejection.OUT_OF_RANGE
+    <span class="kw">if not</span> self.precision.<span class="f">is_quality_ok</span>(pos.variant, pos.kv):
+        <span class="kw">return</span> Rejection.QUALITY
+    est = self.<span class="f">estimate</span>(pos)
+    <span class="kw">if</span> est.ram_bytes &gt; budget.ram_bytes:
+        <span class="kw">return</span> Rejection.RAM
+    <span class="kw">if</span> est.vram_bytes &gt; budget.vram_bytes:
+        <span class="kw">return</span> Rejection.VRAM
+    <span class="kw">if</span> self.<span class="f">config_at</span>(pos).key <span class="kw">in</span> blacklist:
+        <span class="kw">return</span> Rejection.BLACKLISTED
+    <span class="kw">return None</span></pre></div>
+      <div class="card code-explain"><h4>The red cubes in the 3D view</h4><p>Before any setup is used, it must pass these fixed rules: quality limit, free RAM, free GPU memory, and "has not failed before". The learning agent can only choose among setups that pass.</p><p class="meta">Budget = free memory now + memory the current model would release − a safety reserve.</p></div>
+    </div>
+
+    <div class="code-panel" id="c4" role="tabpanel">
+      <div class="code-box"><div class="file">air_sdk/rl/qtable.py</div>
+<pre><span class="kw">def</span> <span class="f">update</span>(self, state, action, reward, next_state, next_mask, *,
+           alpha, gamma, prior=<span class="kw">0.0</span>, next_priors=<span class="kw">None</span>):
+    <span class="s">"""Q(s,a) &lt;- Q(s,a) + alpha * (r + gamma * max Q(s',a') - Q(s,a))"""</span>
+    old = self.<span class="f">q</span>(state, action, prior)
+    target = reward + gamma * self.<span class="f">max_q</span>(next_state, next_mask, next_priors)
+    td_error = target - old
+    new = old + alpha * td_error
+    self.<span class="f">set</span>(state, action, new, self.<span class="f">visits</span>(state, action) + <span class="kw">1</span>)
+    <span class="kw">return</span> new, td_error</pre></div>
+      <div class="card code-explain"><h4>How it learns</h4><p>Tabular Q-learning: after each reply, the value of "this action in this situation" moves toward the reward it actually produced plus the best value reachable next. No neural networks, so every number can be inspected.</p><p class="meta">Saved per model and per device, so learning survives restarts.</p></div>
+    </div>
+
+    <div class="code-panel" id="c5" role="tabpanel">
+      <div class="code-box"><div class="file">air_sdk/rl/reward.py</div>
+<pre>t   = <span class="f">clamp</span>(m.tokens_per_second / baseline.tokens_per_second, <span class="kw">0</span>, <span class="kw">4</span>)
+lat = <span class="f">clamp</span>(baseline.ttft_s / m.ttft_s, <span class="kw">0</span>, <span class="kw">4</span>)
+mem = <span class="f">clamp</span>(<span class="kw">1</span> - m.peak_memory_bytes / m.memory_budget_bytes, -<span class="kw">1</span>, <span class="kw">1</span>)
+q   = <span class="f">clamp</span>(m.quality_loss / max_quality_loss, <span class="kw">0</span>, <span class="kw">1</span>)
+switching = weights.switching * <span class="f">switching_share</span>(m.switch_s, m.request_s)
+
+total = (weights.throughput * (t - <span class="kw">1</span>) + weights.latency * (lat - <span class="kw">1</span>)
+         + weights.memory * mem - weights.quality * q - switching)</pre></div>
+      <div class="card code-explain"><h4>What "better" means</h4><p>Each reply is scored on speed, time to first word, memory left free and measured quality loss, minus any time the user waited for a reload. The weights change with the goal you pick.</p><p class="meta">Failures (e.g. out of memory) receive a fixed penalty and are avoided afterwards.</p></div>
+    </div>
+
+    <div class="code-panel" id="c6" role="tabpanel">
+      <div class="code-box"><div class="file">air_sdk/quantize.py</div>
+<pre><span class="kw">def</span> <span class="f">quantize_q8_0</span>(rows):
+    <span class="s">"""Q8_0: per 32 values, d = max|x| / 127 (fp16), qs = roundf(x / d) (int8)."""</span>
+    blocks = rows.<span class="f">reshape</span>(-<span class="kw">1</span>, QK)
+    amax = np.<span class="f">abs</span>(blocks).<span class="f">max</span>(axis=<span class="kw">1</span>)
+    d = amax / np.<span class="f">float32</span>(<span class="kw">127.0</span>)
+    inv = np.<span class="f">divide</span>(<span class="kw">1.0</span>, d, out=np.<span class="f">zeros_like</span>(d), where=d != <span class="kw">0</span>)
+    out = np.<span class="f">empty</span>(blocks.shape[<span class="kw">0</span>], dtype=_Q8_DTYPE)
+    out[<span class="s">"d"</span>] = d.<span class="f">astype</span>(np.float16)
+    out[<span class="s">"qs"</span>] = <span class="f">_roundf</span>(blocks * inv[:, <span class="kw">None</span>]).<span class="f">astype</span>(np.int8)
+    <span class="kw">return</span> out.<span class="f">tobytes</span>()</pre></div>
+      <div class="card code-explain"><h4>Compression on the device</h4><p>Turns a full-precision model into an 8-bit (or 4-bit) version, block by block, in the exact format llama.cpp uses. Tests check the output byte for byte against llama.cpp's reference method.</p><p class="meta">0.68 GB → 0.36 GB (8-bit) → 0.21 GB (4-bit) in about 13 s.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMPLEMENTATION -->
+<section id="implement">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Implementation</div>
+      <h2>How the SDK is put to work</h2>
+      <p class="lead">One engine, three ways to use it. Pick the one that matches the team; all
+        three get the same automatic optimisation, learning and protection.</p>
+    </div>
+
+    <div class="paths">
+      <div class="card path">
+        <span class="tag">Developers</span>
+        <h3>Inside your application</h3>
+        <p>The application asks EdgeMind to load a model by name, link or file, then sends questions and receives answers. EdgeMind handles everything else behind that single call.</p>
+        <ul><li>Questions, streamed answers and multi-turn chats</li><li>Speed, memory and decision details with every answer</li><li>Errors that explain how to fix them</li></ul>
+      </div>
+      <div class="card path">
+        <span class="tag">IT &amp; operations</span>
+        <h3>Command-line tool</h3>
+        <p>One tool to check a device, list models and what fits, download models, create faster versions, measure quality, chat, and start the web portal.</p>
+        <ul><li>Device readiness checks</li><li>Repeatable roll-out on many machines</li><li>Benchmarking candidate models</li></ul>
+      </div>
+      <div class="card path">
+        <span class="tag">Business users</span>
+        <h3>Ready-made chat portal</h3>
+        <p>A private assistant in the browser, running entirely on the local device, with panels showing what EdgeMind chose, how fast it is and what it is learning.</p>
+        <ul><li>Add any model from the page</li><li>Choose CPU / GPU and the goal</li><li>One-click quality check and compression</li></ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:44px">Roll-out in five steps</h3>
+    <div class="timeline">
+      <div class="tl"><h4>Install</h4><p>Install the free local model engine (Ollama), then EdgeMind straight from its <a href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p><div class="out">≈ 10 minutes</div></div>
+      <div class="tl"><h4>Check</h4><p>Run the built-in health check: it confirms the device is ready or explains what to fix.</p><div class="out">Ready / fix list</div></div>
+      <div class="tl"><h4>Choose a model</h4><p>Name a model from the library, a HuggingFace link, or an approved internal file.</p><div class="out">Downloaded &amp; validated</div></div>
+      <div class="tl"><h4>Connect</h4><p>Point the application, script or portal at EdgeMind, with no configuration files.</p><div class="out">First answer in seconds</div></div>
+      <div class="tl"><h4>Let it learn</h4><p>EdgeMind tunes each device automatically and keeps improving with normal use.</p><div class="out">Faster over time</div></div>
+    </div>
+
+    <div class="req">
+      <div class="card"><h4>Devices</h4><p>Windows, Linux or macOS laptops, desktops and servers</p></div>
+      <div class="card"><h4>Hardware</h4><p>Any modern CPU; NVIDIA GPU used automatically if present</p></div>
+      <div class="card"><h4>Software</h4><p>Python 3.10+ and the free Ollama model engine</p></div>
+      <div class="card"><h4>Models</h4><p>Any open model in GGUF format (the common standard)</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- OBJECTIVE -->
+<section id="objective">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Business objective</div>
+      <h2>Capable, private AI on the hardware companies already own</h2>
+    </div>
+    <div class="objective">
+      <div class="obj"><b>Lower cost</b><span>Replace per-request cloud AI fees with free on-device inference.</span></div>
+      <div class="obj"><b>Less hardware spend</b><span>Get more from existing machines; postpone GPU purchases.</span></div>
+      <div class="obj"><b>Data privacy</b><span>Prompts and answers never leave the device.</span></div>
+      <div class="obj"><b>Fast deployment</b><span>No tuning specialists; each device configures itself.</span></div>
+      <div class="obj"><b>Reliability</b><span>No freezes, automatic recovery, consistent across a mixed fleet.</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span><b style="color:var(--text)">EdgeMind</b> · Adaptive Intelligence Runtime SDK · <a href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer">github.com/sripad2020/EdgeMind</a></span>
+    <span>Figures measured on an Intel Core i5 laptop (16 GB RAM, CPU only). GPU benchmarks are planned.</span>
+  </div>
+</footer>
+
+<script>
+  // Code tabs
+  (function () {
+    var tabs = document.querySelectorAll(".code-tab");
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        tabs.forEach(function (o) { o.setAttribute("aria-selected", o === t ? "true" : "false"); });
+        document.querySelectorAll(".code-panel").forEach(function (p) {
+          p.classList.toggle("active", p.id === t.getAttribute("data-tab"));
+        });
+      });
+    });
+  })();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  // 3D scene: configuration space -> safety filter -> RL agent search -> best setup -> adapt
+  (function () {
+    var wrap = document.getElementById("scene-wrap");
+    var canvas = document.getElementById("scene");
+    if (!window.THREE) { wrap.classList.add("no-webgl"); return; }
+    var renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true }); }
+    catch (e) { wrap.classList.add("no-webgl"); return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    camera.position.set(10, 7.2, 12.5);
+    camera.lookAt(0, -0.2, 0);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    var sun = new THREE.DirectionalLight(0xffffff, 0.65);
+    sun.position.set(6, 12, 8);
+    scene.add(sun);
+
+    var C = {};
+    function css(name) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return new THREE.Color(v || "#888888");
+    }
+    function readColors() {
+      C.safe = css("--accent"); C.bad = css("--bad"); C.good = css("--good"); C.best = css("--warn");
+      C.agent = css("--text-strong"); C.edge = css("--border-strong"); C.base = css("--faint");
+    }
+    readColors();
+
+    var seed = 11;
+    function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+    // ---- configuration lattice --------------------------------------------------------------
+    var NX = 6, NY = 4, NZ = 4, S = 1.3;
+    var group = new THREE.Group();
+    scene.add(group);
+    var geo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    var edgeGeo = new THREE.EdgesGeometry(geo);
+    var cells = [];
+    var sweet = { x: 4, y: 1, z: 2 };
+    for (var x = 0; x < NX; x++) for (var y = 0; y < NY; y++) for (var z = 0; z < NZ; z++) {
+      var mat = new THREE.MeshStandardMaterial({ color: C.base.clone(), transparent: true, opacity: 0, roughness: 0.55, metalness: 0.05 });
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set((x - (NX - 1) / 2) * S, (y - (NY - 1) / 2) * S, (z - (NZ - 1) / 2) * S);
+      mesh.scale.setScalar(0.01);
+      var edges = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: C.edge, transparent: true, opacity: 0 }));
+      mesh.add(edges);
+      group.add(mesh);
+      var dist = Math.abs(x - sweet.x) + Math.abs(y - sweet.y) + Math.abs(z - sweet.z);
+      cells.push({ x: x, y: y, z: z, mesh: mesh, edges: edges, unsafe: false, tried: false,
+                   value: Math.max(0, 1 - dist / 9) * 0.75 + rnd() * 0.25, delay: rnd() * 0.9 });
+    }
+    function cell(x, y, z) {
+      if (x < 0 || y < 0 || z < 0 || x >= NX || y >= NY || z >= NZ) return null;
+      return cells[(x * NY + y) * NZ + z];
+    }
+
+    // ---- agent + trail ----------------------------------------------------------------------
+    var agent = new THREE.Mesh(new THREE.SphereGeometry(0.24, 32, 16),
+      new THREE.MeshStandardMaterial({ color: C.agent, emissive: C.safe, emissiveIntensity: 0.35, roughness: 0.25 }));
+    agent.visible = false;
+    group.add(agent);
+    var trailMat = new THREE.LineBasicMaterial({ color: C.safe, transparent: true, opacity: 0.55 });
+    var trail = new THREE.Line(new THREE.BufferGeometry(), trailMat);
+    group.add(trail);
+    var trailPts = [];
+
+    // ---- captions ---------------------------------------------------------------------------
+    var K = document.getElementById("stage-k"), T = document.getElementById("stage-t"), D = document.getElementById("stage-d");
+    var CAPTIONS = {
+      inspect: ["Stage 1 · Inspect", "Mapping every way to run the model", "Each cube = model version × CPU/GPU split × threads × batch size."],
+      filter: ["Stage 2 · Plan safely", "Unsafe setups are filtered out", "Red cubes would not fit free memory or would break the quality limit."],
+      learn: ["Stage 3 · Learn", "The agent tries safe setups and scores every reply", "Speed, response time, memory and quality become a reward that is remembered."],
+      best: ["Stage 4 · Improve", "Best setup found and remembered", "The next start on this device begins here."],
+      pressure: ["Stage 5 · Adapt", "Memory got tight: setups re-checked", "Setups that no longer fit turn red; the agent moves to a safe one before the device slows down."]
+    };
+    function caption(key) { var c = CAPTIONS[key]; K.textContent = c[0]; T.textContent = c[1]; D.textContent = c[2]; }
+
+    // ---- state machine ----------------------------------------------------------------------
+    var phase = "inspect", phaseT = 0, cycle = 1, frozen = false;
+    var current = null, target = null, best = null, hopT = 0, hops = 0, eps = 0.35;
+    var HOP = 0.55;
+
+    function safeCells() { return cells.filter(function (c) { return !c.unsafe; }); }
+    function pickBest() {
+      best = null;
+      safeCells().forEach(function (c) { if (!best || c.value > best.value) best = c; });
+    }
+    function applySafety(fraction) {
+      cells.forEach(function (c) { c.unsafe = rnd() < fraction; c.tried = false; });
+      pickBest();
+    }
+    function neighbors(c) {
+      var out = [];
+      [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].forEach(function (d) {
+        var n = cell(c.x + d[0], c.y + d[1], c.z + d[2]);
+        if (n && !n.unsafe) out.push(n);
+      });
+      return out;
+    }
+    function manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z); }
+    function chooseNext() {
+      var ns = neighbors(current);
+      if (!ns.length) {
+        var safe = safeCells();
+        return safe[Math.floor(rnd() * safe.length)];
+      }
+      if (rnd() < eps) return ns[Math.floor(rnd() * ns.length)];
+      ns.sort(function (a, b) { return manhattan(a, best) - manhattan(b, best) || b.value - a.value; });
+      return ns[0];
+    }
+    function startLearning(fromCell) {
+      current = fromCell; target = null; hopT = 0; hops = 0; eps = 0.35;
+      agent.visible = true; agent.position.copy(current.mesh.position);
+      trailPts = [current.mesh.position.clone()];
+      current.tried = true;
+      setPhase("learn");
+    }
+    function setPhase(p) { phase = p; phaseT = 0; caption(p); }
+    function newCycle() {
+      cycle += 1;
+      applySafety(0.3);
+      cells.forEach(function (c) { c.mesh.scale.setScalar(0.01); c.mesh.material.opacity = 0; });
+      agent.visible = false; trailPts = []; current = null;
+      setPhase("inspect");
+    }
+
+    var tmp = new THREE.Color();
+    function cellTarget(c) {
+      if (phase === "inspect" && phaseT < c.delay) return { col: C.base, op: 0, eop: 0, sc: 0.01 };
+      var filtered = phase !== "inspect";
+      if (filtered && c.unsafe) return { col: C.bad, op: 0.16, eop: 0.18, sc: 0.85 };
+      if (c === best && (phase === "best" || phase === "pressure" && !c.unsafe)) {
+        return { col: C.best, op: 0.95, eop: 0.9, sc: 1 + 0.08 * Math.sin(phaseT * 6) };
+      }
+      if (c.tried) { tmp.copy(C.safe).lerp(C.good, 0.35 + 0.65 * c.value); return { col: tmp.clone(), op: 0.9, eop: 0.7, sc: 1 }; }
+      return { col: C.safe, op: filtered ? 0.42 : 0.6, eop: 0.45, sc: 1 };
+    }
+
+    function update(dt) {
+      phaseT += dt;
+      group.rotation.y += dt * 0.12;
+
+      if (frozen) { /* static picture (reduced motion): no state changes */ }
+      else if (phase === "inspect" && phaseT > 1.8) setPhase("filter");
+      else if (phase === "filter" && phaseT > 1.8) {
+        var safe = safeCells();
+        safe.sort(function (a, b) { return manhattan(b, best) - manhattan(a, best); });
+        startLearning(safe[0]);
+      } else if (phase === "learn") {
+        if (!target) { target = chooseNext(); hopT = 0; }
+        hopT += dt / HOP;
+        var t = Math.min(1, hopT), e = t * t * (3 - 2 * t);
+        agent.position.lerpVectors(current.mesh.position, target.mesh.position, e);
+        agent.position.y += Math.sin(Math.PI * t) * 0.35;
+        if (t >= 1) {
+          current = target; target = null; hops += 1; eps *= 0.9;
+          current.tried = true;
+          trailPts.push(current.mesh.position.clone());
+          if (trailPts.length > 12) trailPts.shift();
+          if (current === best || hops > 40) { if (current !== best) best = current; setPhase("best"); }
+        }
+      } else if (phase === "best" && phaseT > 2.6) {
+        if (cycle % 2 === 1) {
+          setPhase("pressure");
+          // Memory pressure: some safe setups, including the current one, no longer fit.
+          current.unsafe = true;
+          safeCells().forEach(function (c) { if (rnd() < 0.18) c.unsafe = true; });
+          pickBest();
+        } else { newCycle(); }
+      } else if (phase === "pressure" && phaseT > 2.2) {
+        // Resume learning from where the agent is; it can only step onto safe setups.
+        startLearning(current);
+        cycle += 1;
+      }
+
+      var k = Math.min(1, dt * 6);
+      cells.forEach(function (c) {
+        var tg = cellTarget(c);
+        c.mesh.material.color.lerp(tg.col, k);
+        c.mesh.material.opacity += (tg.op - c.mesh.material.opacity) * k;
+        c.edges.material.opacity += (tg.eop - c.edges.material.opacity) * k;
+        c.edges.material.color.copy(C.edge);
+        var s = c.mesh.scale.x + (tg.sc - c.mesh.scale.x) * k;
+        c.mesh.scale.setScalar(Math.max(0.01, s));
+      });
+      if (trailPts.length > 1) trail.geometry.setFromPoints(trailPts.concat([agent.position.clone()]));
+      trail.visible = agent.visible && trailPts.length > 0;
+    }
+
+    // ---- sizing, theme, visibility ------------------------------------------------------------
+    function resize() {
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.position.z = w < 640 ? 16 : 12.5;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    document.addEventListener("themechange", function () {
+      readColors();
+      agent.material.color.copy(C.agent);
+      agent.material.emissive.copy(C.safe);
+      trailMat.color.copy(C.safe);
+      if (reduced) { update(0); renderer.render(scene, camera); }
+    });
+
+    var mouseX = 0;
+    wrap.addEventListener("mousemove", function (ev) {
+      var r = wrap.getBoundingClientRect();
+      mouseX = (ev.clientX - r.left) / r.width - 0.5;
+    });
+
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    applySafety(0.3);
+    caption("inspect");
+
+    if (reduced) {
+      // Static final picture: filtered lattice, a short tried path, best highlighted.
+      phase = "best"; phaseT = 0; caption("best"); frozen = true;
+      cells.forEach(function (c) { c.mesh.scale.setScalar(1); });
+      safeCells().forEach(function (c) { if (manhattan(c, best) <= 2) c.tried = true; });
+      agent.visible = true; agent.position.copy(best.mesh.position);
+      for (var i = 0; i < 30; i++) update(0.2);
+      renderer.render(scene, camera);
+      return;
+    }
+
+    var running = true, last = performance.now();
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        running = entries[0].isIntersecting;
+        if (running) { last = performance.now(); requestAnimationFrame(loop); }
+      }).observe(wrap);
+    }
+    function loop(now) {
+      if (!running) return;
+      var dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      update(dt);
+      camera.position.x += ((10 + mouseX * 3) - camera.position.x) * 0.05;
+      camera.lookAt(0, -0.2, 0);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  })();
+</script>
+
+</body>
+</html>

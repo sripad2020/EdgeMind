@@ -1,0 +1,8 @@
+[
+ {
+  "model": "gemma2:2b",
+  "status": "does_not_fit",
+  "reason": "no configuration fits the currently free memory (RAM 1.53 GiB, VRAM 0.00 GiB after headroom); close other applications or use a smaller model variant",
+  "weights_gib": 1.51
+ }
+]

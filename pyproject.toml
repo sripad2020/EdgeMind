@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edgemind"
+version = "0.2.0"
+description = "EdgeMind: run any open LLM on the device you have, automatically optimised and self-tuning (tabular Q-learning)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = [
+    "psutil>=5.9",
+    "httpx>=0.27",  # Ollama backend
+    "numpy>=1.24",  # deterministic GGUF quantizer (air_sdk.quantize)
+]
+
+[project.urls]
+Homepage = "https://github.com/sripad2020/EdgeMind"
+Repository = "https://github.com/sripad2020/EdgeMind"
+Issues = "https://github.com/sripad2020/EdgeMind/issues"
+
+[project.scripts]
+air-sdk = "air_sdk.cli:main"
+
+[project.optional-dependencies]
+# NVIDIA GPU telemetry (NVML). Optional: the SDK runs CPU-only without it.
+gpu = ["nvidia-ml-py>=12.535"]
+# Real inference runtime. Optional: the simulated backend is used for development/tests.
+llama = ["llama-cpp-python>=0.3.0"]
+# Chat website (webapp/)
+web = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["pytest>=8", "mypy>=1.10", "ruff>=0.5", "types-psutil"]
+
+[tool.setuptools.packages.find]
+include = ["air_sdk*", "webapp*"]
+
+[tool.setuptools.package-data]
+air_sdk = ["py.typed"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+disallow_any_explicit = false
+extra_checks = true
+files = ["air_sdk", "tests", "main.py", "webapp"]
+
+[[tool.mypy.overrides]]
+module = ["pynvml", "llama_cpp"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "SIM", "RUF", "PL", "ANN", "BLE", "C4", "PIE", "PT", "RET"]
+ignore = [
+    "PLR0913", # many-argument constructors are intentional (explicit config)
+    "PLR2004", # magic values in thresholds are documented constants
+    "S311",    # RL exploration RNG is not security-sensitive (documented)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "PLR2004", "ANN", "S108", "PLR0911", "PLR0912"]
+"main.py" = ["T201"]
+"air_sdk/cli.py" = ["T201"]
+"examples/*" = ["T201", "INP001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: uses the real local Ollama server and the real machine's memory"]
