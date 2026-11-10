@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIR-SDK Chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◆</span>
+      <div>
+        <h1>AIR-SDK Chat</h1>
+        <p class="sub">Adaptive Intelligence Runtime · tabular Q-learning over local Ollama models</p>
+      </div>
+    </div>
+    <div class="status" id="session-status"><span class="dot idle"></span><span id="status-text">No model loaded</span></div>
+  </header>
+
+  <main class="layout">
+    <!-- Left: session + hardware -->
+    <aside class="panel left">
+      <section class="card">
+        <h2>Session</h2>
+        <form id="session-form" autocomplete="off">
+          <label>Model
+            <select id="model" required></select>
+          </label>
+          <details class="add-model">
+            <summary>Add any model…</summary>
+            <p class="hint">An Ollama name (e.g. <code>llama3.2:1b</code>, <code>phi3:mini</code>)
+               or any GGUF on HuggingFace (<code>hf.co/user/repo:Q4_K_M</code>).</p>
+            <div class="add-row">
+              <input id="pull-name" type="text" maxlength="232" placeholder="llama3.2:1b">
+              <button type="button" id="pull-btn">Download</button>
+            </div>
+            <p class="hint" id="pull-status"></p>
+          </details>
+          <fieldset class="seg" id="device-group">
+            <legend>Device</legend>
+            <label><input type="radio" name="device" value="auto" checked><span>Auto</span></label>
+            <label><input type="radio" name="device" value="cpu"><span>CPU</span></label>
+            <label><input type="radio" name="device" value="gpu" id="device-gpu"><span>GPU</span></label>
+          </fieldset>
+          <p class="hint" id="gpu-hint"></p>
+          <label>Optimisation objective
+            <select id="objective">
+              <option value="balanced">Balanced</option>
+              <option value="throughput">Throughput (tokens/s)</option>
+              <option value="latency">Latency (time to first token)</option>
+              <option value="memory">Memory (smallest footprint)</option>
+            </select>
+          </label>
+          <div class="row2">
+            <label>Max context
+              <select id="n_ctx">
+                <option value="2048">2048</option>
+                <option value="4096" selected>4096</option>
+                <option value="8192">8192</option>
+                <option value="16384">16384</option>
+              </select>
+            </label>
+            <label>Adapt every
+              <input id="adapt_every" type="number" min="1" max="100" value="3">
+            </label>
+          </div>
+          <label class="toggle"><input type="checkbox" id="rl_enabled" checked><span>Reinforcement learning</span></label>
+          <label class="toggle"><input type="checkbox" id="auto_adapt" checked><span>Auto-adapt configuration</span></label>
+          <label class="toggle"><input type="checkbox" id="probe" checked><span>Quick speed test on load</span></label>
+          <label class="toggle"><input type="checkbox" id="auto_context" checked><span>Grow context only when needed</span></label>
+          <button type="submit" class="primary" id="start-btn">Load &amp; optimise</button>
+          <p class="error" id="session-error" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Hardware profile</h2>
+        <dl class="kv" id="hardware"></dl>
+      </section>
+    </aside>
+
+    <!-- Center: chat -->
+    <section class="chat">
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="empty" id="empty-state">
+          <p class="big">Load a model to start chatting.</p>
+          <p>AIR-SDK analyses the model and your hardware, picks a safe configuration, and
+             learns from every reply which configuration performs best on this machine.</p>
+        </div>
+      </div>
+      <form class="composer" id="chat-form">
+        <textarea id="prompt" rows="2" placeholder="Message the model…  (Enter to send, Shift+Enter for a new line)" maxlength="32000" disabled></textarea>
+        <div class="composer-bar">
+          <label>Max tokens <input id="max_tokens" type="number" min="1" max="4096" value="512"></label>
+          <label>Temperature <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+          <button type="button" class="ghost" id="clear-btn">New chat</button>
+          <button type="submit" class="primary" id="send-btn" disabled>Send</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Right: SDK insight -->
+    <aside class="panel right">
+      <nav class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-tab="plan">Plan</button>
+        <button role="tab" class="tab" data-tab="policy">RL policy</button>
+        <button role="tab" class="tab" data-tab="learning">Learning</button>
+        <button role="tab" class="tab" data-tab="model">Model</button>
+      </nav>
+      <section class="tabpane active" id="tab-plan">
+        <div class="card"><h2>Current execution plan</h2><dl class="kv" id="plan"></dl></div>
+        <div class="card"><h2>Last reply</h2><dl class="kv" id="last-metrics"><dt>—</dt><dd>No replies yet</dd></dl></div>
+        <div class="card"><h2>Adaptation</h2><dl class="kv" id="adaptation"></dl>
+          <ul class="plain events" id="events"></ul></div>
+        <div class="card"><h2>Conservative fallback</h2><dl class="kv" id="fallback"></dl></div>
+      </section>
+      <section class="tabpane" id="tab-policy">
+        <div class="card">
+          <h2>Next decision</h2>
+          <p class="hint">Every action the agent could take next, the configuration it leads to,
+             and whether the deterministic safety rules allow it.</p>
+          <div id="policy-head" class="chips"></div>
+          <div class="table-wrap"><table class="policy" id="policy-table"></table></div>
+        </div>
+      </section>
+      <section class="tabpane" id="tab-learning">
+        <div class="card"><h2>Reward history</h2><div id="sparkline" class="spark"></div></div>
+        <div class="card"><h2>Q-learning</h2><dl class="kv" id="learning"></dl></div>
+        <div class="card"><h2>Performance</h2><dl class="kv" id="performance"></dl></div>
+        <div class="card"><h2>Best configurations so far</h2><ol class="top" id="top-configs"></ol></div>
+      </section>
+      <section class="tabpane" id="tab-model">
+        <div class="card"><h2>Model intelligence profile</h2><dl class="kv" id="profile"></dl></div>
+        <div class="card"><h2>Precision variants</h2><ul class="plain" id="variants"></ul>
+          <p class="hint">The RL engine switches between these versions of the same model.</p></div>
+        <div class="card"><h2>Automatic quantization</h2>
+          <dl class="kv" id="quant-plan"></dl>
+          <button type="button" class="primary" id="quantize-btn" hidden>Create quantized versions</button>
+          <p class="hint" id="quant-note"></p>
+          <p class="error" id="quant-error" role="alert"></p></div>
+        <div class="card"><h2>Measured answer quality</h2>
+          <p class="hint">Each version answers 12 fixed questions; answers are compared word by word
+             with the highest-precision version. The measured loss replaces the built-in estimate.</p>
+          <dl class="kv" id="quality"></dl>
+          <button type="button" class="ghost" id="quality-btn">Measure answer quality</button>
+          <p class="error" id="quality-error" role="alert"></p></div>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>
