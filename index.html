@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head>  
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EdgeMind — Adaptive Intelligence Runtime</title>
@@ -213,7 +213,7 @@
 
     /* 3D scene */
     .scene-wrap { position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--scene-bg); overflow: hidden; box-shadow: var(--shadow); }
-    #scene { display: block; width: 100%; height: 460px; }
+    .scene-wrap canvas { display: block; width: 100%; height: 460px; }
     .scene-caption { position: absolute; left: 16px; top: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; pointer-events: none; }
     .stage-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; max-width: 460px; box-shadow: var(--shadow); }
     .stage-pill .k { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
@@ -223,7 +223,7 @@
     .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
     .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
     .scene-fallback { display: none; padding: 60px 20px; text-align: center; color: var(--muted); }
-    .scene-wrap.no-webgl #scene { display: none; }
+    .scene-wrap.no-webgl canvas { display: none; }
     .scene-wrap.no-webgl .scene-fallback { display: block; }
     .scene-notes { margin-top: 14px; }
     .scene-notes .card h4 { font-size: 13px; }
@@ -246,6 +246,61 @@
     .code-explain p { color: var(--muted); font-size: 14px; margin-top: 8px; }
     .code-explain .meta { margin-top: 12px; font-size: 12.5px; color: var(--faint); }
 
+    /* what it solves */
+    .solve { display: flex; flex-direction: column; gap: 10px; }
+    .solve .prob, .solve .ans { font-size: 14px; border-radius: 9px; padding: 10px 12px; }
+    .solve .prob { background: var(--bad-soft); border: 1px solid var(--bad-border); color: var(--text); }
+    .solve .ans { background: var(--good-soft); border: 1px solid var(--good-border); color: var(--text); }
+    .solve .prob b, .solve .ans b { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 3px; }
+    .solve .prob b { color: var(--bad); }
+    .solve .ans b { color: var(--good); }
+    .sig { margin-top: 30px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .sig .obj span { font-size: 14px; }
+
+    /* fintech */
+    .why-edge { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 30px; }
+    .usecase .check { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-strong); font-size: 12.5px; color: var(--good); }
+    .usecase .check.none { color: var(--warn); }
+    .answer-path { margin-top: 30px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .answer-path div { background: var(--surface); padding: 16px; border-right: 1px solid var(--border); font-size: 13.5px; color: var(--muted); }
+    .answer-path div:last-child { border-right: none; }
+    .answer-path b { display: block; color: var(--text-strong); font-size: 14px; margin-bottom: 4px; }
+    .note { margin-top: 16px; font-size: 13px; color: var(--faint); }
+
+    /* research */
+    .rq { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+    .rq .card h4 { color: var(--accent); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+    .rq .card p { color: var(--text); font-size: 14px; margin-top: 6px; }
+    .axes { position: absolute; right: 16px; bottom: 14px; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; pointer-events: none; line-height: 1.5; }
+    .axes b { color: var(--text-strong); font-weight: 600; }
+
+    /* research explained: simple / precise switch */
+    .mode-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-top: 18px; }
+    .mode-switch button { font: inherit; font-size: 13px; border: none; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+    .mode-switch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--accent-border); }
+    #explained .p { display: none; }
+    #explained.precise .s { display: none; }
+    #explained.precise .p { display: inline; }
+    #explained.precise div.p, #explained.precise p.p { display: block; }
+    .sub { margin: 44px 0 14px; }
+    .sub h3 { font-size: 20px; }
+    .sub p { color: var(--muted); margin-top: 6px; font-size: 14.5px; }
+    .oneline { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 20px 22px; font-size: 17px; color: var(--text-strong); box-shadow: var(--shadow); }
+    .oneline small { display: block; margin-top: 8px; font-size: 12px; color: var(--faint); letter-spacing: .08em; text-transform: uppercase; }
+    .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+    table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+    .tbl th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .tbl td { padding: 11px 14px; border-top: 1px solid var(--border); vertical-align: top; color: var(--text); }
+    .tbl tr:first-child td { border-top: none; }
+    .tbl td:first-child { color: var(--text-strong); font-weight: 600; }
+    .tbl .ok { color: var(--good); font-weight: 600; }
+    .tbl .no { color: var(--bad); font-weight: 600; }
+    .tbl .hl td { background: var(--accent-soft); }
+    .walls .card h3 { display: flex; align-items: center; gap: 10px; }
+    .walls .num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-border); flex: none; }
+    .limits li { margin: 6px 0; color: var(--muted); font-size: 14.5px; }
+    .limits b { color: var(--text-strong); }
+
     footer { border-top: 1px solid var(--border); padding: 30px 0 44px; font-size: 13px; color: var(--faint); }
     footer .wrap { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 
@@ -257,6 +312,10 @@
       .flow .stage:last-child { border-bottom: none; }
       .does, .paths, .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .timeline, .objective { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sig, .rq { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .why-edge, .answer-path { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .answer-path div { border-right: none; border-bottom: 1px solid var(--border); }
+      .axes { display: none; }
       .compare-head { display: none; }
       .row { grid-template-columns: 1fr; gap: 8px; margin-bottom: 22px; }
       .row .when { padding: 0; }
@@ -266,9 +325,10 @@
     @media (max-width: 620px) {
       section { padding: 54px 0; }
       .hero { padding: 60px 0 48px; }
-      .stats, .g2, .g3, .g4, .does, .paths, .timeline, .req, .objective { grid-template-columns: 1fr; }
+      .stats, .g2, .g3, .g4, .does, .paths, .timeline, .req, .objective, .sig, .rq,
+      .why-edge, .answer-path { grid-template-columns: 1fr; }
       .bar-row { grid-template-columns: 100px 1fr 60px; font-size: 12.5px; }
-      #scene { height: 340px; }
+      .scene-wrap canvas { height: 340px; }
       .stage-pill { max-width: none; }
       .legend { display: none; }
     }
@@ -284,12 +344,12 @@
     <a class="brand" href="#top"><span class="logo">▲</span>EdgeMind</a>
     <div class="nav-right">
       <div class="links">
+        <a href="#solves">What it solves</a>
         <a href="#see">See it work</a>
         <a href="#how">How it works</a>
-        <a href="#compare">Normal vs EdgeMind</a>
-        <a href="#does">What it does</a>
+        <a href="#fintech">Fintech</a>
+        <a href="#explained">Research</a>
         <a href="#source">Source</a>
-        <a href="#implement">Implementation</a>
       </div>
       <a class="gh-link" href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
       <button class="theme-btn" id="theme-btn" type="button" aria-label="Switch colour theme">Dark</button>
@@ -329,6 +389,7 @@
       <span class="badge">CPU or NVIDIA GPU</span>
       <span class="badge">Runs fully on-device</span>
       <span class="badge">Self-tuning with reinforcement learning</span>
+      <span class="badge">Answers checked, retried or refused</span>
     </div>
     <div class="btns">
       <a class="btn primary" href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>View on GitHub</a>
@@ -343,6 +404,78 @@
     </div>
   </div>
 </header>
+
+<!-- WHAT IT SOLVES + SIGNIFICANCE -->
+<section id="solves">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">What it solves</div>
+      <h2>Five problems that stop companies running AI on their own machines</h2>
+      <p class="lead">Open AI models are free to use, but running them well on ordinary hardware,
+        and trusting what they say, is hard. EdgeMind removes each blocker with rules,
+        measurement and one small learning agent.</p>
+    </div>
+    <div class="grid g3">
+      <div class="card solve">
+        <h3>The model does not fit or runs slowly</h3>
+        <div class="prob"><b>Problem</b>Default settings ignore the device: freezes, crashes, or
+          a few words per second.</div>
+        <div class="ans"><b>EdgeMind</b>Reads the model and free memory first, refuses unsafe
+          setups, compresses the model, and tunes itself on that exact machine.</div>
+      </div>
+      <div class="card solve">
+        <h3>One compression level for every task</h3>
+        <div class="prob"><b>Problem</b>A small version is fast but makes more mistakes; a large
+          one is accurate but slow. Usually one is chosen for everything.</div>
+        <div class="ans"><b>EdgeMind</b>Answers on the fastest version and moves to a more
+          accurate one only when that task needs it.</div>
+      </div>
+      <div class="card solve">
+        <h3>Confident but wrong answers</h3>
+        <div class="prob"><b>Problem</b>A model can invent a database column or a total, and
+          the answer looks just as sure as a correct one.</div>
+        <div class="ans"><b>EdgeMind</b>Checks SQL, code, JSON and numbers with fixed rules;
+          every answer is passed, retried on a stronger version, or marked failed.</div>
+      </div>
+      <div class="card solve">
+        <h3>Sensitive data cannot go to the cloud</h3>
+        <div class="prob"><b>Problem</b>Customer, financial and health data often may not leave
+          the company's own systems.</div>
+        <div class="ans"><b>EdgeMind</b>Everything runs on the device. No prompt or answer is
+          sent anywhere.</div>
+      </div>
+      <div class="card solve">
+        <h3>Long conversations get slow and confused</h3>
+        <div class="prob"><b>Problem</b>Sending the whole history every time makes prompts long
+          and mixes topics together.</div>
+        <div class="ans"><b>EdgeMind</b>Keeps one memory section per task and sends only the
+          relevant facts, inside a fixed token budget.</div>
+      </div>
+      <div class="card solve">
+        <h3>Nobody knows what a model can really do here</h3>
+        <div class="prob"><b>Problem</b>Leaderboards measure full-size models on large GPUs, not
+          the compressed copy on your laptop.</div>
+        <div class="ans"><b>EdgeMind</b>Measures each task on this device and keeps the pass and
+          fail record per task and version.</div>
+      </div>
+    </div>
+
+    <div class="head" style="margin: 54px 0 0">
+      <div class="eyebrow">Why it matters</div>
+      <h2>Trustworthy AI that runs where the data already is</h2>
+    </div>
+    <div class="sig">
+      <div class="obj"><b>Measured, not claimed</b><span>What a model can do is measured on the
+        device it runs on, at each compression level.</span></div>
+      <div class="obj"><b>Proof with every answer</b><span>Each checkable answer carries its
+        result: checked against the schema, the expected number, or the required fields.</span></div>
+      <div class="obj"><b>No second AI to trust</b><span>Decisions use fixed rules and one small
+        Q-learning table, so every choice can be explained and audited.</span></div>
+      <div class="obj"><b>Hardware companies own</b><span>Ordinary laptops and office PCs run the
+        model, which removes per-request cloud fees.</span></div>
+    </div>
+  </div>
+</section>
 
 <!-- 3D: SEE IT WORK -->
 <section id="see">
@@ -582,6 +715,315 @@
   </div>
 </section>
 
+<!-- FINTECH -->
+<section id="fintech">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Edge AI in fintech</div>
+      <h2>Financial data stays inside the bank. The AI should run there too.</h2>
+      <p class="lead">Banks, lenders, payment companies and accounting firms handle data that
+        often may not leave their own systems. EdgeMind runs the model on machines they already
+        operate and checks the answers that feed money, records and reports.</p>
+    </div>
+    <div class="why-edge">
+      <div class="obj"><b>Data residency</b><span>Customer and transaction data never leaves the
+        premises or the device.</span></div>
+      <div class="obj"><b>Audit trail</b><span>Every answer records which model version answered
+        and whether its check passed.</span></div>
+      <div class="obj"><b>Explainable</b><span>Routing and checks are fixed rules plus one small
+        Q-learning table, with no hidden second model.</span></div>
+      <div class="obj"><b>Works offline</b><span>Branches, field agents and back offices keep
+        working without a network.</span></div>
+      <div class="obj"><b>Predictable cost</b><span>No per-request cloud fees, so cost does not grow
+        with volume.</span></div>
+    </div>
+    <div class="grid g3">
+      <div class="card usecase">
+        <h3>KYC and onboarding documents</h3>
+        <p>Pull name, ID number, address and dates from application text into structured fields.</p>
+        <div class="check">Checked: JSON parses, every required field present.</div>
+      </div>
+      <div class="card usecase">
+        <h3>Analyst questions on internal data</h3>
+        <p>"Total disbursed loans per branch this quarter" becomes one SQL query on a read-only
+          copy of the database.</p>
+        <div class="check">Checked: query compiles against the real schema; one statement only.</div>
+      </div>
+      <div class="card usecase">
+        <h3>Invoices and reconciliation</h3>
+        <p>Extract line items, tax and totals from supplier invoices for accounts payable.</p>
+        <div class="check">Checked: fields present; totals recomputed by the safe calculator.</div>
+      </div>
+      <div class="card usecase">
+        <h3>Transaction categorisation</h3>
+        <p>Assign each transaction description to one of a fixed set of categories.</p>
+        <div class="check">Checked: answer must be one of the allowed labels.</div>
+      </div>
+      <div class="card usecase">
+        <h3>Risk and interest calculations</h3>
+        <p>EMIs, interest, ratios and percentages explained step by step for staff.</p>
+        <div class="check">Checked: final number matches the calculator's result.</div>
+      </div>
+      <div class="card usecase">
+        <h3>Policy and compliance questions</h3>
+        <p>Staff ask about internal policies; answers stay inside the company network.</p>
+        <div class="check none">No automatic check: labelled "unchecked" for human review.</div>
+      </div>
+    </div>
+    <div class="answer-path">
+      <div><b>1 · Question</b>Arrives on the bank's own machine.</div>
+      <div><b>2 · Task detected</b>SQL, extraction, maths… by fixed rules.</div>
+      <div><b>3 · Fastest proven version</b>Chosen from this device's pass record.</div>
+      <div><b>4 · Checked</b>Failed? Retried on a more accurate version.</div>
+      <div><b>5 · Answer + receipt</b>Passed, failed or unchecked, always labelled.</div>
+    </div>
+    <p class="note">EdgeMind helps keep data on-premises and makes AI answers auditable. It is
+      not itself a regulatory certification. Categorisation labels and calculator checks for
+      the fintech tasks above are on the roadmap; SQL, JSON, maths and code checks exist today.</p>
+  </div>
+</section>
+
+<!-- RESEARCH EXPLAINED (for everyone; switch between simple and precise wording) -->
+<section id="explained">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">The research, explained for everyone</div>
+      <h2>How can a bank use AI on its own cheap computers, without trusting wrong answers?</h2>
+      <p class="lead">
+        <span class="s">This is the question the research answers. Use the switch to read it in
+          plain words or in precise technical terms; the facts are the same.</span>
+        <span class="p">The question behind the research: per-task selection of the cheapest
+          execution profile that stays correct, on commodity on-premises hardware, with
+          deterministic verification and tabular Q-learning as the only learned component.</span>
+      </p>
+      <div class="mode-switch" role="group" aria-label="Wording">
+        <button type="button" data-mode="simple" aria-pressed="true">Simple words</button>
+        <button type="button" data-mode="precise" aria-pressed="false">Precise</button>
+      </div>
+    </div>
+
+    <!-- 1. the problem -->
+    <div class="sub"><h3>1 · Three walls stop banks using AI today</h3></div>
+    <div class="grid g3 walls">
+      <div class="card">
+        <h3><span class="num">1</span>Privacy</h3>
+        <p><span class="s">Customer data often may not be sent to outside AI services.</span>
+          <span class="p">Data-residency and confidentiality requirements push inference
+            on-premises; external inference APIs are often not permitted.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="num">2</span>Cost</h3>
+        <p><span class="s">Running AI on their own machines usually means buying expensive GPU
+          servers.</span>
+          <span class="p">On-premises fleets are commodity CPUs with limited RAM, which forces
+            small open models and aggressive quantization (Q4/Q8).</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="num">3</span>Trust</h3>
+        <p><span class="s">AI sometimes gives wrong answers that look confident. In finance,
+          one wrong total or account number is costly.</span>
+          <span class="p">Quantization degrades accuracy by an unknown amount per task, and
+            there is no cheap, standard way to verify outputs or prove fitness per task.</span></p>
+      </div>
+    </div>
+
+    <!-- 2. the idea -->
+    <div class="sub"><h3>2 · The idea in one sentence</h3></div>
+    <div class="oneline">
+      <span class="s">For every type of job, find the smallest, cheapest version of the AI that
+        is <em>proven</em> to do that job well enough, use it, and check every answer it
+        gives.</span>
+      <span class="p">For each task, select the lowest-cost execution profile (base model +
+        optional LoRA adapter + precision map) whose 95% Wilson lower bound on gold accuracy is
+        within 5 points of the full-precision baseline (non-inferiority); route requests to
+        it, verify every output deterministically, and escalate to the next profile on
+        failure.</span>
+    </div>
+
+    <!-- 3. the analogy -->
+    <div class="sub">
+      <h3>3 · Think of a bank branch with junior and senior clerks</h3>
+      <p>A sensible manager tests each junior clerk on each kind of work, gives every job to
+        the cheapest clerk proven good at it, has a checker verify each finished job, sends
+        failures to a senior, and keeps a register for the auditors. EdgeMind does the same
+        with versions of an AI model.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>At the bank branch</th><th>In EdgeMind</th><th>Technical term</th></tr></thead>
+        <tbody>
+          <tr><td>Junior clerk: fast, cheap, sometimes wrong</td><td>Small, compressed model version</td><td>4-bit quantized weights (Q4)</td></tr>
+          <tr><td>Senior clerk: careful, slower, costly</td><td>Full-size model</td><td>Full-precision baseline (F16)</td></tr>
+          <tr><td>Clerk with special training</td><td>Model plus a small skill add-on</td><td>LoRA adapter</td></tr>
+          <tr><td>Testing each clerk on each job type</td><td>Skill tests on this computer</td><td>Profiling, 200+ gold-scored items per task</td></tr>
+          <tr><td>"Proven good enough"</td><td>No worse than the senior, with 95% confidence</td><td>Non-inferiority on the Wilson lower bound</td></tr>
+          <tr><td>The checker</td><td>Fixed rules: SQL fits the database, numbers match, fields present</td><td>Deterministic verifiers</td></tr>
+          <tr><td>Failed work goes to a senior</td><td>Retry on a bigger version</td><td>Verify-then-escalate cascade</td></tr>
+          <tr><td>Manager learning who to start with</td><td>A small score table that learns</td><td>Tabular Q-learning router</td></tr>
+          <tr><td>Auditor's register</td><td>A label on every answer</td><td>Per-answer receipt: profile, check result, attempts</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 4. how each wall is solved -->
+    <div class="sub"><h3>4 · How the research removes each wall</h3></div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Wall</th><th>How it is solved</th></tr></thead>
+        <tbody>
+          <tr><td>Privacy</td><td>
+            <span class="s">The AI runs on the bank's own computers; nothing leaves the building.</span>
+            <span class="p">Fully local inference (Ollama / llama.cpp); no external API calls.</span></td></tr>
+          <tr><td>Cost and hardware</td><td>
+            <span class="s">Most jobs run on the small, cheap version, so ordinary office PCs are enough.</span>
+            <span class="p">Lowest-cost qualified profile per task; Q4 and mixed precision cut model memory by roughly 50–70% and raise tokens per second.</span></td></tr>
+          <tr><td>Wrong answers</td><td>
+            <span class="s">Every checkable answer is checked; a failed one is redone by a stronger version or clearly marked as failed.</span>
+            <span class="p">Schema-compiled SQL, numeric match and JSON-field checks with escalation; failures are reported, never hidden.</span></td></tr>
+          <tr><td>"Is the small version good enough?"</td><td>
+            <span class="s">It is tested on this very computer before it is used, not assumed.</span>
+            <span class="p">Measured per device and per precision with confidence intervals, instead of leaderboard figures from large GPUs.</span></td></tr>
+          <tr><td>Auditors and regulators</td><td>
+            <span class="s">Every answer says which version produced it and whether it passed its check.</span>
+            <span class="p">A per-request record of profile, check outcome and attempts.</span></td></tr>
+          <tr><td>Explainability</td><td>
+            <span class="s">No hidden second AI decides anything; every rule can be read and explained.</span>
+            <span class="p">Routing is rules plus one Q-table; no neural router and no LLM judge.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 5. worked example -->
+    <div class="sub">
+      <h3>5 · A worked example: a small lender with 8 GB office PCs</h3>
+      <p>Illustrative only. Real outcomes come from running the study on the lender's own
+        machines.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Job</th><th>Example</th><th>Check used</th><th>What testing might find</th><th>What EdgeMind would do</th></tr></thead>
+        <tbody>
+          <tr><td>Data questions</td><td>"Total loans disbursed per branch this quarter?"</td><td>SQL must fit the real database tables</td><td>Small version mixes up table names</td><td>Use a mid-size version for SQL</td></tr>
+          <tr><td>KYC form reading</td><td>Name, ID number, date of birth from an application</td><td>Every field present and valid</td><td>Small version is fine</td><td>Use the smallest version: fastest</td></tr>
+          <tr><td>EMI calculation</td><td>EMI for a ₹5 lakh loan at 9% over 3 years</td><td>Final number must equal the calculator's</td><td>Small version slips on arithmetic</td><td>Small version + maths add-on; every answer checked against the calculator</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      <span class="s">Each job gets the cheapest worker proven good at it; every result is
+        checked; failures are redone or flagged.</span>
+      <span class="p">This is research question 4: the cheapest qualified profile per task,
+        expected to beat any single fixed profile on seconds per correct answer.</span>
+    </p>
+
+    <!-- 6. what is new -->
+    <div class="sub"><h3>6 · What is new compared with today's options</h3></div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Approach</th><th>The catch</th></tr></thead>
+        <tbody>
+          <tr><td>Cloud AI services</td><td>Data leaves the bank; the bill grows with every request.</td></tr>
+          <tr><td>One local model for everything</td><td>Too slow if large, too error-prone if small; answers unchecked.</td></tr>
+          <tr><td>Typical "AI routers"</td><td>Use another AI to decide and to judge, which itself needs trust and a GPU server.</td></tr>
+          <tr class="hl"><td>This research</td><td>
+            <span class="s">Tests per job on the bank's own hardware, picks the cheapest version proven good enough, checks every answer with fixed rules, keeps a record. Q-learning is the only learning.</span>
+            <span class="p">Combines per-task quantization sensitivity, adapter gain under compression, statistical non-inferiority qualification and verifier-driven cascades with tabular RL, measured on commodity CPUs. Novelty to be confirmed by a literature review.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 7. status and limits -->
+    <div class="sub"><h3>7 · Where it stands, and its limits</h3></div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Part</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>SDK: local models, compression, checked answers, escalation, sectioned memory</td><td class="ok">Built and tested</td></tr>
+          <tr><td>Research toolkit: 670+ test items, model builds, scoring, statistics, policy replay, report</td><td class="ok">Built and tested (156 tests pass)</td></tr>
+          <tr><td>Experiment results</td><td class="no">Not run yet (needs more free memory)</td></tr>
+          <tr><td>Fintech checks: invoice totals, allowed transaction categories, ID-number formats</td><td class="no">Planned</td></tr>
+          <tr><td>Skill add-ons (adapters) for the chosen model</td><td class="no">Not obtained yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="limits">
+      <li><b>A check proves the format, not the meaning.</b>
+        <span class="s">Correct-looking SQL can still answer the wrong question. The research measures how often this happens.</span>
+        <span class="p">RQ6 quantifies false passes (check passed, gold wrong) per task.</span></li>
+      <li><b>Open-ended answers cannot be checked automatically.</b> Policy advice and
+        explanations are labelled "unchecked" for a person to review.</li>
+      <li><b>The main idea could turn out false.</b>
+        <span class="s">If tests show every job needs the same model size, the per-job saving disappears, but checking and retrying still help.</span>
+        <span class="p">If quantization sensitivity is not task-dependent (H1 false), task-aware mixes give no gain; cascades and verification still apply.</span></li>
+      <li><b>Not a compliance certificate.</b> EdgeMind helps with privacy and audit trails;
+        it does not make a bank compliant by itself.</li>
+    </ul>
+
+    <!-- 8. the pitch -->
+    <div class="sub"><h3>8 · In one line</h3></div>
+    <div class="oneline">
+      We let banks run AI on the computers they already own by using, for each type of job,
+      the smallest AI version proven, on their own machines, to do that job well enough,
+      checking every answer, and keeping a record for auditors.
+      <small>The one-line pitch</small>
+    </div>
+  </div>
+</section>
+
+<!-- RESEARCH (3D: the profile grid has three real axes) -->
+<section id="research">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Research · verified execution profiles</div>
+      <h2>For each task, the cheapest model version proven to stay correct</h2>
+      <p class="lead">One question drives the research: can a device choose, per task, the
+        cheapest combination of skill adapter and compression level that is statistically
+        proven correct? It uses only fixed answer checks and tabular Q-learning, with no
+        other learned component.</p>
+    </div>
+    <div class="scene-wrap" id="grid-wrap">
+      <canvas id="grid3d" aria-label="3D grid of execution profiles: tasks by precision by adapter; qualified profiles light up and the cheapest qualified one per task is chosen"></canvas>
+      <div class="scene-fallback">The 3D view needs WebGL. Each cube is one execution profile
+        (task × compression × adapter). A profile qualifies when, with 95% confidence, it is
+        at most 5 points worse than the full model; the cheapest qualified one per task is
+        chosen.</div>
+      <div class="scene-caption">
+        <div class="stage-pill">
+          <div class="k" id="g-k">Step 1 · Profile</div>
+          <div class="t" id="g-t">Every version answers every test item</div>
+          <div class="d" id="g-d">Each cube = one task × one compression level × one adapter.</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--faint)"></i>not yet proven</span>
+        <span><i style="background:var(--good)"></i>qualified</span>
+        <span><i style="background:var(--accent)"></i>baseline (full model)</span>
+        <span><i style="background:var(--warn)"></i>chosen for the task</span>
+      </div>
+      <div class="axes"><b>across</b> task · <b>up</b> compression · <b>depth</b> adapter<br>
+        Illustrative values; real ones come from the study's report.</div>
+    </div>
+    <div class="rq">
+      <div class="card"><h4>RQ1 · Sensitivity</h4><p>Do different tasks break in different
+        layers when those layers are compressed?</p></div>
+      <div class="card"><h4>RQ2 · Task-aware mixes</h4><p>Does keeping only a task's sensitive
+        layers precise beat uniform compression at equal memory?</p></div>
+      <div class="card"><h4>RQ3 · Adapters under compression</h4><p>How much of a skill
+        adapter's gain survives on a Q8 or Q4 base model?</p></div>
+      <div class="card"><h4>RQ4 · Joint choice</h4><p>Does choosing adapter and compression
+        together lower the time per correct answer?</p></div>
+      <div class="card"><h4>RQ5 · Q-learning control</h4><p>Can tabular Q-learning pick the
+        starting version as well as tuned thresholds?</p></div>
+      <div class="card"><h4>RQ6 · Checks vs truth</h4><p>How often does a passed check still
+        hide a wrong answer?</p></div>
+    </div>
+    <p class="note">Harness: <code>python -m air_sdk.research</code>. It provides 670+
+      generated test items with computed gold answers, per-layer-group compressed builds,
+      Wilson intervals, exact replay of selection policies and a report. Experiments run on a
+      CPU-only laptop.</p>
+  </div>
+</section>
+
 <!-- SOURCE -->
 <section id="source">
   <div class="wrap">
@@ -765,11 +1207,25 @@ total = (weights.throughput * (t - <span class="kw">1</span>) + weights.latency 
 
 <footer>
   <div class="wrap">
-    <span><b style="color:var(--text)">EdgeMind</b> · Adaptive Intelligence Runtime SDK · <a href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer">github.com/sripad2020/EdgeMind</a></span>
-    <span>Figures measured on an Intel Core i5 laptop (16 GB RAM, CPU only). GPU benchmarks are planned.</span>
+    <span><b style="color:var(--text)">EdgeMind</b> · Adaptive Runtime SDK · <a href="https://github.com/sripad2020/EdgeMind" target="_blank" rel="noopener noreferrer">github.com/sripad2020/EdgeMind</a></span>
   </div>
 </footer>
 
+<script>
+  // Research explained: switch between simple and precise wording.
+  (function () {
+    var sec = document.getElementById("explained");
+    if (!sec) return;
+    var buttons = sec.querySelectorAll(".mode-switch button");
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var precise = b.getAttribute("data-mode") === "precise";
+        sec.classList.toggle("precise", precise);
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+      });
+    });
+  })();
+</script>
 <script>
   // Code tabs
   (function () {
@@ -1032,6 +1488,192 @@ total = (weights.throughput * (t - <span class="kw">1</span>) + weights.latency 
       update(dt);
       camera.position.x += ((10 + mouseX * 3) - camera.position.x) * 0.05;
       camera.lookAt(0, -0.2, 0);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  })();
+</script>
+<script>
+  // 3D profile grid: task (x) × compression (y) × adapter (z). Illustrative values only.
+  (function () {
+    var wrap = document.getElementById("grid-wrap");
+    var canvas = document.getElementById("grid3d");
+    if (!wrap || !canvas) return;
+    if (!window.THREE) { wrap.classList.add("no-webgl"); return; }
+    var renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true }); }
+    catch (e) { wrap.classList.add("no-webgl"); return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+    camera.position.set(9, 6.5, 11);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    var sun = new THREE.DirectionalLight(0xffffff, 0.6);
+    sun.position.set(5, 10, 7);
+    scene.add(sun);
+
+    var C = {};
+    function css(n) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      return new THREE.Color(v || "#888888");
+    }
+    function readColors() {
+      C.idle = css("--faint"); C.ok = css("--good"); C.base = css("--accent");
+      C.pick = css("--warn"); C.edge = css("--border-strong"); C.q = css("--text-strong");
+    }
+    readColors();
+
+    // Tasks: SQL, maths, JSON, code. Compression (y): 0 = Q4, 1 = mix, 2 = Q8, 3 = F16.
+    // Adapter (z): 0 = none, 1-2 = skill adapters. Pass rates are made up to show the idea:
+    // SQL loses accuracy at Q4, JSON barely cares, adapters help maths and code.
+    var TASKS = 4, PREC = 4, ADP = 3, S = 1.35;
+    var sensitivity = [0.22, 0.12, 0.03, 0.14];
+    var adapterGain = [0.02, 0.12, 0.0, 0.1];
+    var baseRate = [0.78, 0.6, 0.93, 0.66];
+    function rate(t, y, z) {
+      var loss = sensitivity[t] * [1, 0.35, 0.12, 0][y];
+      var gain = z === 0 ? 0 : adapterGain[t] * (z === 1 ? 1 : 0.6) * [0.5, 0.8, 0.95, 1][y];
+      return Math.max(0, Math.min(0.99, baseRate[t] - loss + gain));
+    }
+    function cost(y, z) { return [1, 1.25, 1.6, 2.6][y] + (z ? 0.08 : 0); }
+    var HALF_CI = 0.03, DELTA = 0.05;  // lower bound of the 95% interval; allowed shortfall
+
+    var group = new THREE.Group();
+    scene.add(group);
+    var geo = new THREE.BoxGeometry(0.62, 0.62, 0.62);
+    var edgeGeo = new THREE.EdgesGeometry(geo);
+    var cubes = [];
+    for (var t = 0; t < TASKS; t++) for (var y = 0; y < PREC; y++) for (var z = 0; z < ADP; z++) {
+      var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: C.idle.clone(), transparent: true, opacity: 0, roughness: 0.5 }));
+      m.position.set((t - (TASKS - 1) / 2) * S, (y - (PREC - 1) / 2) * S, (z - (ADP - 1) / 2) * S);
+      var e = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: C.edge, transparent: true, opacity: 0 }));
+      m.add(e);
+      group.add(m);
+      cubes.push({ t: t, y: y, z: z, mesh: m, edges: e, rate: rate(t, y, z), cost: cost(y, z),
+                   baseline: y === 3 && z === 0, delay: (t * 0.12 + y * 0.08 + z * 0.05) });
+    }
+    cubes.forEach(function (c) {
+      var b = cubes.filter(function (o) { return o.t === c.t && o.baseline; })[0];
+      c.qualified = !c.baseline && c.rate - HALF_CI >= b.rate - DELTA;
+    });
+    var chosen = [];
+    for (var task = 0; task < TASKS; task++) {  // cheapest of: qualified ones + the full model
+      var q = cubes.filter(function (c) { return c.t === task && (c.qualified || c.baseline); });
+      q.sort(function (a, b) { return a.cost - b.cost || b.rate - a.rate; });
+      chosen.push(q[0]);
+    }
+
+    var ball = new THREE.Mesh(new THREE.SphereGeometry(0.2, 24, 12),
+      new THREE.MeshStandardMaterial({ color: C.q, emissive: C.pick, emissiveIntensity: 0.4 }));
+    ball.visible = false;
+    group.add(ball);
+
+    var K = document.getElementById("g-k"), T = document.getElementById("g-t"), D = document.getElementById("g-d");
+    var CAP = {
+      profile: ["Step 1 · Profile", "Every version answers every test item", "Each cube = one task × one compression level × one adapter."],
+      qualify: ["Step 2 · Qualify", "Only proven versions stay lit", "Qualified = with 95% confidence, at most 5 points worse than the full model (blue)."],
+      choose: ["Step 3 · Choose", "Each task goes to its cheapest qualified version", "Questions are routed to the gold cube; a failed check moves up a level."]
+    };
+    function caption(k) { K.textContent = CAP[k][0]; T.textContent = CAP[k][1]; D.textContent = CAP[k][2]; }
+
+    var phase = "profile", phaseT = 0, ballTask = 0, ballT = 0;
+    function setPhase(p) { phase = p; phaseT = 0; caption(p); }
+    var tmp = new THREE.Color();
+
+    function look(c) {
+      var isPick = chosen.indexOf(c) >= 0;
+      if (phase === "profile") {
+        var on = phaseT > c.delay;
+        tmp.copy(C.idle).lerp(C.ok, on ? Math.min(1, (phaseT - c.delay) / 1.4) * c.rate * 0.5 : 0);
+        return { col: tmp.clone(), op: on ? 0.55 : 0, eop: on ? 0.45 : 0, sc: on ? 1 : 0.01 };
+      }
+      if (c.baseline) return { col: C.base, op: 0.9, eop: 0.8, sc: 1 };
+      if (phase === "choose" && isPick) {
+        var pulse = chosen[ballTask] === c ? 0.1 * Math.sin(phaseT * 7) : 0;
+        return { col: C.pick, op: 0.95, eop: 0.9, sc: 1.08 + pulse };
+      }
+      if (c.qualified) return { col: C.ok, op: phase === "choose" ? 0.55 : 0.85, eop: 0.6, sc: 1 };
+      return { col: C.idle, op: 0.12, eop: 0.18, sc: 0.8 };
+    }
+
+    function update(dt) {
+      phaseT += dt;
+      group.rotation.y += dt * 0.1;
+      if (phase === "profile" && phaseT > 3.2) setPhase("qualify");
+      else if (phase === "qualify" && phaseT > 2.6) { setPhase("choose"); ballTask = 0; ballT = 0; }
+      else if (phase === "choose") {
+        ball.visible = true;
+        ballT += dt / 1.3;
+        var target = chosen[ballTask].mesh.position;
+        var start = new THREE.Vector3(target.x, (PREC / 2 + 1.2) * S, target.z);
+        var e = Math.min(1, ballT);
+        ball.position.lerpVectors(start, target, e * e * (3 - 2 * e));
+        if (ballT > 1.5) { ballTask += 1; ballT = 0; }
+        if (ballTask >= TASKS) { ball.visible = false; setPhase("profile"); ballTask = 0; }
+      }
+      var k = Math.min(1, dt * 6);
+      cubes.forEach(function (c) {
+        var g = look(c);
+        c.mesh.material.color.lerp(g.col, k);
+        c.mesh.material.opacity += (g.op - c.mesh.material.opacity) * k;
+        c.edges.material.opacity += (g.eop - c.edges.material.opacity) * k;
+        c.edges.material.color.copy(C.edge);
+        var s = c.mesh.scale.x + (g.sc - c.mesh.scale.x) * k;
+        c.mesh.scale.setScalar(Math.max(0.01, s));
+      });
+    }
+
+    function resize() {
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.position.z = w < 640 ? 15 : 11;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.addEventListener("themechange", function () {
+      readColors();
+      ball.material.color.copy(C.q); ball.material.emissive.copy(C.pick);
+      if (reduced) { update(0); camera.lookAt(0, 0, 0); renderer.render(scene, camera); }
+    });
+    var mouseX = 0;
+    wrap.addEventListener("mousemove", function (ev) {
+      var r = wrap.getBoundingClientRect();
+      mouseX = (ev.clientX - r.left) / r.width - 0.5;
+    });
+    caption("profile");
+    camera.lookAt(0, 0, 0);
+
+    if (reduced) {  // static final picture: qualified cubes and each task's choice
+      setPhase("choose"); ballTask = TASKS;
+      for (var i = 0; i < 40; i++) {
+        cubes.forEach(function (c) { var g = look(c); c.mesh.material.color.copy(g.col);
+          c.mesh.material.opacity = g.op; c.edges.material.opacity = g.eop; c.mesh.scale.setScalar(g.sc); });
+      }
+      renderer.render(scene, camera);
+      return;
+    }
+
+    var running = true, last = performance.now();
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        running = entries[0].isIntersecting;
+        if (running) { last = performance.now(); requestAnimationFrame(loop); }
+      }).observe(wrap);
+    }
+    function loop(now) {
+      if (!running) return;
+      var dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      update(dt);
+      camera.position.x += ((9 + mouseX * 3) - camera.position.x) * 0.05;
+      camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
       requestAnimationFrame(loop);
     }
