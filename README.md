@@ -16,6 +16,51 @@ llm = air_sdk.load("qwen2.5:0.5b")
 print(llm.ask("What is the capital of France?"))
 ```
 
+## What it solves
+
+| Problem | What EdgeMind does |
+|---|---|
+| The model does not fit, freezes the machine, or runs slowly with default settings | Reads the model and free memory first, refuses unsafe setups, compresses the model, and tunes itself on that exact machine (tabular Q-learning) |
+| One compression level is used for every task: fast but error-prone, or accurate but slow | Answers on the fastest version and moves to a more accurate one only when the task needs it |
+| A model invents a column or a total, and the answer looks just as confident | Checks SQL, code, JSON and numbers with fixed rules; each answer is passed, retried on a stronger version, or marked failed |
+| Sensitive data may not leave the company's systems | Everything runs on the device; nothing is sent to a cloud service |
+| Long conversations get slow and mix topics together | One memory section per task; only relevant facts are sent, within a token budget |
+| Nobody knows what a compressed model can really do on this hardware | Pass/fail evidence is recorded per task and per version on the device itself |
+
+## Why it matters
+
+- **Measured, not claimed.** What a model can do is measured on the device it runs on, at
+  each compression level, not taken from leaderboards run on large GPUs.
+- **Proof with every answer.** Checkable answers carry their result (checked against the
+  schema, the expected number, or the required fields) instead of only looking confident.
+- **No second AI to trust.** Every decision uses fixed rules plus one small Q-learning
+  table, so each choice can be explained and audited.
+- **Hardware companies already own.** Ordinary laptops and office PCs run the model, which
+  removes per-request cloud fees.
+
+## Edge AI in fintech
+
+Banks, lenders, payment companies and accounting firms hold data that often may not leave
+their own systems. EdgeMind runs the model on machines they already operate and labels
+every answer that feeds money, records or reports.
+
+| Use | Check that applies |
+|---|---|
+| KYC / onboarding: fields from application text | JSON parses, required fields present |
+| Analyst questions on internal data ("loans disbursed per branch this quarter") | SQL compiles against the real schema, one read-only statement |
+| Invoices and reconciliation | Fields present; totals recomputed by the safe calculator *(roadmap)* |
+| Transaction categorisation | Answer must be one of the allowed labels *(roadmap)* |
+| EMI, interest and ratio explanations | Final number matches the calculator |
+| Policy and compliance questions | No automatic check: labelled "unchecked" for human review |
+
+Why on the edge: data stays on the premises, every answer has an audit record, routing is
+explainable, branches keep working offline, and cost does not grow with request volume.
+EdgeMind helps with data residency and auditability; it is not a regulatory certification.
+
+**Research.** The study *Verified Execution Profiles for Edge LLMs* (section 9) measures,
+per task, the cheapest adapter + compression combination that is statistically no worse
+than the full model.
+
 ---
 
 ## 1. Install (once)
@@ -64,7 +109,7 @@ llm.reply("question")                            # -> Reply (text + speed + what
 for piece in llm.stream("question"):             # -> answer word by word
     print(piece, end="")
 
-chat = llm.conversation(system="Be brief.")      # remembers earlier messages
+chat = llm.conversation(system="Be brief.")      # sectioned memory (see section 5)
 chat.say("Hi, I'm Asha.")
 chat.say("What's my name?")                      # -> "Asha"
 chat.reset()
@@ -95,13 +140,108 @@ air_sdk.doctor()                                 # setup checklist
 | `reserve_ram_gb` | 10% of RAM | memory always left free for your other programs |
 | `data_dir` | `~/.air_sdk` | where learning is saved |
 
-## 4. Command line
+## 4. Verified skills — the speed of Q4, the correctness of Q8
+
+Tell EdgeMind what the task is. For tasks that can be checked automatically, it answers on
+the **fastest** precision, **checks** the answer with a fixed rule (no AI judge, nothing is
+executed), and **retries on a more accurate precision only if the check fails**. Every
+result is remembered per model, task and precision, so the next answer starts where it
+is known to pass.
+
+```python
+schema = "CREATE TABLE orders (id INTEGER, customer_id INTEGER, amount REAL);"
+r = llm.reply("Total amount per customer", skill="sql", context=schema)
+r.verified, r.escalated, r.attempts      # True, False, (("Q4_K_M", True, "SQL is valid ..."),)
+
+llm.use("python")                        # default task for following questions
+llm.skill_report("sql")                  # passes/fails per precision, where it starts next
+```
+
+| Skill | Check | `context` |
+|---|---|---|
+| `sql` | Query is compiled (`EXPLAIN`) against your schema in a private in-memory database: tables and columns must exist; never executed; one statement only | schema (`CREATE TABLE …`) |
+| `python` | Code must parse (`ast.parse`); never executed | — |
+| `json` | Must parse; must contain the required keys | `name, age` or an example object |
+| `math` | Final number must match the expected value | expected number |
+| `general`, `summarise` | No automatic check (answered once) | — |
+
+**How blame is assigned:** a precision is marked as failing a task only when a more
+accurate precision then *passed* the same request. If every precision fails, only the most
+accurate attempt is counted: the task is beyond the model, not the fast precision's fault.
+
+Measured live on this laptop (`qwen2.5:0.5b`, Q4_K_M + Q8_0, 4 SQL questions with a real
+schema and 3 maths questions): 6 of 7 answers passed **on the fast Q4_K_M**; one SQL
+question failed on both precisions and was reported as failed instead of being returned
+as if it were correct.
+
+Command line: `air-sdk ask qwen2.5:0.5b "Average order per city" --skill sql --context
+"CREATE TABLE …"` (exit code 3 if the answer fails its check), `air-sdk skills <model>`,
+and `/skill sql` inside `air-sdk chat`. The website has a **Task** picker beside the chat box.
+
+You usually do not need to name the task: the default `skill="auto"` detects it per
+message (see the next section).
+
+## 5. Context-aware conversations — sectioned memory
+
+A long chat moves between pieces of work: a database, then a Python helper, a quick
+calculation, back to the database. Sending the whole history every time makes prompts
+long and slow, and mixes topics up. EdgeMind keeps **sections** instead:
+
+```python
+chat = llm.conversation()
+chat.say(f"My database:\n{schema}\nTotal order amount per customer name.")  # SQL section
+chat.say("now only customers in Paris")                 # follow-up: same section
+chat.say("Write a Python function that slugifies a title")  # new section (Python)
+chat.say("add type hints to it")                        # stays in the Python section
+chat.say("What is 17 * 23?")                            # maths: checked against 391
+chat.say("Back to the orders query: sort by total")     # returns to the SQL section
+chat.say("New task: summarise this text ...")           # explicit new section
+
+r = chat.reply("...")
+r.label      # 'Section: Tables: customers, orders (sql) - task sql (detected) - check passed'
+chat.sections()   # what is remembered: preferences + each section's facts
+```
+
+**What happens for every message (rules only, no extra model):**
+
+1. **Facts are extracted** and stored in the section: SQL schemas (CREATE / ALTER / DROP
+   applied in order, so the newest definition wins), definitions ("X means Y"), Python
+   function names, required JSON keys, the expected result of a calculation (computed by a
+   safe parser, never `eval`), and global preferences ("always …").
+2. **The task is detected** (SQL, Python, JSON, maths, summarise, general). A weak signal
+   such as "now sort it" keeps the section's current task.
+3. **The message is routed** to a section by shared names (tables, functions, terms),
+   keywords and recency; "back to …" and "new task: …" are understood. A clearly different
+   task starts a new section even if a few everyday words overlap.
+4. **A small prompt is built** within a token budget: only the active section; only the
+   tables the question names plus the tables linked to them by a foreign key, in compact
+   form (`orders(id PK, customer_id->customers, amount)`); then as many recent turns as
+   fit. If it still does not fit: drop less relevant facts → drop older turns → (the
+   context grows automatically) → last resort, the bare question with a notice.
+5. **The answer is checked against the full stored facts**, not the trimmed prompt: a
+   query that uses a table left out of the prompt still passes, and one that invents a
+   table fails. General answers that contain SQL, Python or JSON get a bonus check.
+6. **Corrections** ("no, that's wrong …") after an answer that passed its check count as a
+   failure for that precision, so the next answer starts on a more accurate one.
+
+Limits keep memory bounded: 8 sections (least recently used removed first), 24 turns per
+section, 64 tables, 32 definitions/names, 8 preferences.
+
+Measured live (`qwen2.5:0.5b`, 7-message conversation across SQL / Python / maths / JSON):
+each message was routed to the right section; all 7 answers passed their checks; prompts
+were 7–353 estimated tokens (the Python question carried no schema at all: ~23 tokens).
+
+**Servers:** `air_sdk.context.SessionStore` keeps one sectioned memory per conversation id
+(30-minute idle expiry, bounded count, a lock per conversation). The website sends a random
+conversation id, so the server holds the memory and the browser sends only the new message.
+
+## 6. Command line
 
 ```bash
 air-sdk doctor                            # check setup
 air-sdk models                            # installed models, and which fit in memory now
 air-sdk ask   qwen2.5:0.5b "What is QUIC?"
-air-sdk chat  qwen2.5:0.5b                # interactive (/summary /reset /bye)
+air-sdk chat  qwen2.5:0.5b                # interactive (/sections /summary /reset /bye)
 air-sdk pull  hf.co/bartowski/SmolLM2-360M-Instruct-GGUF:Q4_K_M
 air-sdk import C:/models/my-model.gguf    # use a local file
 air-sdk faster smollm2:360m               # make Q8/Q4 versions + measure quality
@@ -109,7 +249,7 @@ air-sdk quality smollm2:360m
 air-sdk web --port 8000                   # chat website
 ```
 
-## 5. Chat website
+## 7. Chat website
 
 ```bash
 air-sdk web          # then open http://127.0.0.1:8000
@@ -120,7 +260,7 @@ Pick a model (or **Add any model…** by name / HuggingFace link), device and go
 speed tests, memory/context adaptation and measured quality. Local-only and hardened
 (see *Security* below).
 
-## 6. Examples
+## 8. Examples
 
 | File | Shows |
 |---|---|
@@ -129,8 +269,42 @@ speed tests, memory/context adaptation and measured quality. Local-only and hard
 | `examples/03_any_model.py` | Ollama library, HuggingFace, local files, friendly errors |
 | `examples/04_make_it_faster.py` | create faster versions and measure their quality |
 | `examples/05_all_options.py` | every option + the advanced engine |
+| `examples/06_verified_skills.py` | verified skills: SQL / maths / JSON / Python checks and escalation |
+| `examples/07_sectioned_context.py` | one conversation across several tasks: sections, routing, budget |
 
-## 7. When something goes wrong
+## 9. Research harness — verified execution profiles
+
+`python -m air_sdk.research` runs the study *Verified Execution Profiles for Edge LLMs*:
+which adapter + precision each task needs on this device, with statistical proof.
+
+```bash
+E=experiments/main
+python -m air_sdk.research --exp $E init                      # built-in sets: SQL 202, maths 231, JSON 240, code 30 (dev)
+python -m air_sdk.research --exp $E fetch gsm8k               # optional public benchmarks (gsm8k, mbpp)
+python -m air_sdk.research --exp $E build smollm2:360m --baseline --uniform --sensitivity 8   # RQ1 builds
+python -m air_sdk.research --exp $E profile smollm2:360m smollm2:360m-air-q8_0 smollm2:360m-air-q4_0 \
+    smollm2:360m-air-sens8-g0 smollm2:360m-air-sens8-g1 smollm2:360m-air-sens8-g2 smollm2:360m-air-sens8-g3 \
+    --files sql,math,json --n-ctx 1024
+python -m air_sdk.research --exp $E report                    # report.md + report.json
+python -m air_sdk.research --exp $E suggest-mix smollm2:360m --task sql --keep 2   # -> e.g. sql:1,3
+python -m air_sdk.research --exp $E build smollm2:360m --mix sql:1,3 --group-size 8  # RQ2 build
+python -m air_sdk.research --exp $E build smollm2:360m --adapter math.gguf --label math --on smollm2:360m-air-q4_0  # RQ3
+python -m air_sdk.research --exp $E clean smollm2:360m        # remove this study's builds from Ollama
+```
+
+| Part | What it does |
+|---|---|
+| Items | JSONL per task, split 80% profile / 20% router by a hash of the id (stable) |
+| Online check | What EdgeMind sees: SQL compiles, number present, JSON keys, Python parses |
+| Gold score | Evaluation only: SQL execution accuracy on a read-only database, exact number, every JSON field, code tests in a locked-down Docker container (no network, read-only, non-root, 5 s). Without Docker, code gets no gold score — never a plain subprocess |
+| Builds | Uniform Q8/Q4, one layer group at Q4 (sensitivity), task-aware mixes, LoRA adapters (GGUF) — all from the F16 source by EdgeMind's quantizer; base weights untouched |
+| Grid | Wilson 95% intervals; a profile is *qualified* only if its lower bound beats the base model |
+| Policies (RQ4/5) | Exact replay of logs: fixed profiles, cheapest-first cascade, tuned threshold, tabular Q-learning; tuned on the profile split, reported on the router split |
+| Report | Grid, sensitivity map with McNemar tests, adapter gains, policies, checks vs gold |
+
+Needs an F16 source model (e.g. `smollm2:360m`); runs are resumable; temperature 0, fixed seed.
+
+## 10. When something goes wrong
 
 Every error says what happened **and how to fix it**, e.g.:
 
@@ -206,6 +380,8 @@ Backends: `ollama` (default), `llama_cpp` (`pip install -e ".[llama]"`), `simula
 | Module | Role |
 |---|---|
 | `easy.py`, `cli.py` | Simple API (`load`, `LLM`, `Conversation`, `doctor`) and command line |
+| `skills/` | Verified skills: deterministic answer checks, verify-then-escalate, pass/fail routing |
+| `context/` | Sectioned memory: fact extraction, task detection, routing, token budget, safe calculator, server session store |
 | `analysis/` | Hardened GGUF parser, Model Intelligence Profile, quantization catalogue |
 | `hardware/` | Hardware profile (psutil, NVML) and bounded background telemetry |
 | `engines/` | Precision candidates, memory estimation / CPU-GPU placement, candidate lattice |
