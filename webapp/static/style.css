@@ -115,6 +115,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .composer { border-top: 1px solid var(--border); padding: 10px; }
 .composer textarea { resize: vertical; min-height: 44px; max-height: 240px; margin: 0; }
+.skill-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.skill-row label { margin: 0; min-width: 200px; }
+.skill-row .ctx { flex: 1; min-width: 240px; }
+.skill-row textarea { margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .composer-bar { display: flex; align-items: flex-end; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .composer-bar label { margin: 0; width: 120px; }
 .composer-bar .ghost { margin-left: auto; }

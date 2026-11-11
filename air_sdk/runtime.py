@@ -165,6 +165,9 @@ class _Request:
     seed: int | None
     on_token: TokenCallback | None
     on_reset: ResetCallback | None
+    # Run on this precision variant (index into the precision ladder) instead of letting the
+    # RL policy choose; used by verified skills. Safety checks still apply.
+    pin_variant: int | None = None
 
     @property
     def chars(self) -> int:
@@ -494,15 +497,32 @@ class AdaptiveModel:
         self, messages: Sequence[ChatMessage | dict[str, object]], max_tokens: int = 256,
         temperature: float = 0.7, seed: int | None = None, *,
         on_token: TokenCallback | None = None, on_reset: ResetCallback | None = None,
+        precision: str | None = None,
     ) -> GenerationResponse:
         """Multi-turn chat using the backend's native chat template (one RL episode).
 
         ``on_token`` receives streamed text; ``on_reset`` is called if a failure forces a
         rollback-and-retry, so streaming UIs can discard the partial answer.
+        ``precision`` (e.g. ``"Q8_0"``) runs this request on that weight precision instead
+        of the policy's choice, if it is safe right now; otherwise the policy decides.
         """
         msgs = _validate_messages(messages, self._rt.safety.max_prompt_chars)
+        pin = None if precision is None else self._variant_index(precision)
         return self._submit(_Request(None, msgs, *self._common(max_tokens, temperature, seed),
-                                     on_token, on_reset))
+                                     on_token, on_reset, pin))
+
+    def precision_ladder(self) -> tuple[str, ...]:
+        """Available weight precisions, highest precision (largest) first."""
+        if self._planner is None:
+            self.optimize()
+        return tuple(v.quant.name for v in self._require_planner().space.precision.variants)
+
+    def _variant_index(self, precision: str) -> int:
+        name = require_str("precision", precision, max_len=32).upper()
+        ladder = self.precision_ladder()
+        if name not in ladder:
+            raise ValidationError(f"precision {precision!r} is not available; have {list(ladder)}")
+        return ladder.index(name)
 
     def _common(
         self, max_tokens: int, temperature: float, seed: int | None
@@ -531,7 +551,7 @@ class AdaptiveModel:
 
     # ---- decisions ----------------------------------------------------------------------------
 
-    def _decide(self, request_tokens: int) -> _Decision:
+    def _decide(self, request_tokens: int, pin_variant: int | None = None) -> _Decision:
         """Observe the state, complete the previous episode's Q-update (this state is its s'),
         and choose the configuration for the next request."""
         planner, agent, pos = self._ready()
@@ -543,6 +563,14 @@ class AdaptiveModel:
         mask = planner.action_mask(pos, budget, blacklist)
         priors = self._priors(pos)
         self._flush_pending(state, mask, priors)
+
+        if pin_variant is not None:
+            pinned = planner.best_for_variant(pin_variant, budget, blacklist)
+            if pinned is not None:
+                # A caller-chosen precision (verified skills) is not the agent's decision,
+                # so it is not learned from; it still had to pass every safety check.
+                return _Decision(state, Action.MAINTAIN, False, priors[Action.MAINTAIN],
+                                 pinned, learn=False, relief=False)
 
         action, explored = Action.MAINTAIN, False
         if rt.rl_enabled and rt.auto_adapt and self._decisions % rt.adapt_every == 0:
@@ -561,10 +589,16 @@ class AdaptiveModel:
         return _Decision(state, action, explored, priors[action], target,
                          learn=rt.rl_enabled, relief=False)
 
-    def _take_decision(self, request_tokens: int) -> tuple[_Decision, float, FailureKind | None]:
+    def _take_decision(
+        self, request_tokens: int, pin_variant: int | None = None,
+    ) -> tuple[_Decision, float, FailureKind | None]:
         """Return (decision, seconds this request waited for a background load, failure of
         that background load). Without a prepared decision, decide synchronously."""
         prepared, self._next = self._next, None
+        if pin_variant is not None:
+            if prepared is not None:
+                self._join_prefetch()  # the prepared choice is replaced by the pinned one
+            return self._decide(request_tokens, pin_variant), 0.0, None
         if prepared is None:
             return self._decide(request_tokens), 0.0, None
         t0 = time.perf_counter()
@@ -616,7 +650,8 @@ class AdaptiveModel:
         rt = self._rt
         self._last_request_tokens = req.chars // 4 + req.max_tokens
         self._grow_context_if_needed(req)
-        decision, waited, prefetch_failure = self._take_decision(self._last_request_tokens)
+        decision, waited, prefetch_failure = self._take_decision(self._last_request_tokens,
+                                                                 req.pin_variant)
         target = decision.target
 
         outcome: _Outcome | FailureKind = (
@@ -1057,6 +1092,14 @@ class AdaptiveModel:
         if self._planner is None or self._pos is None:
             return None
         return self._planner.space.config_at(self._pos)
+
+    @property
+    def context_limit(self) -> int:
+        """Largest prompt+answer size (tokens) this model may use here: the planner's maximum
+        context (the active context grows to it automatically), else a safe default."""
+        if self._planner is not None:
+            return int(self._planner.max_context)
+        return min(4096, self._primary.context_length)
 
     def performance_report(self) -> dict[str, object]:
         s = self._stats

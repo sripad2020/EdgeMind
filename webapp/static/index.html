@@ -92,9 +92,25 @@
       </div>
       <form class="composer" id="chat-form">
         <textarea id="prompt" rows="2" placeholder="Message the model…  (Enter to send, Shift+Enter for a new line)" maxlength="32000" disabled></textarea>
+        <div class="skill-row">
+          <label>Task
+            <select id="skill" title="Verified tasks check each answer and retry on a more accurate precision if the check fails">
+              <option value="auto" selected>Auto-detect (checked when possible)</option>
+              <option value="general">General (no check)</option>
+              <option value="sql">SQL ✓ checked against schema</option>
+              <option value="python">Python ✓ must parse</option>
+              <option value="json">JSON ✓ must parse / keys</option>
+              <option value="math">Maths ✓ expected answer</option>
+              <option value="summarise">Summarise (no check)</option>
+            </select>
+          </label>
+          <label class="ctx" id="ctx-wrap" hidden><span id="ctx-label">Context</span>
+            <textarea id="skill-context" rows="2" maxlength="20000" placeholder=""></textarea>
+          </label>
+        </div>
         <div class="composer-bar">
           <label>Max tokens <input id="max_tokens" type="number" min="1" max="4096" value="512"></label>
-          <label>Temperature <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+          <label>Temperature <input id="temperature" type="number" min="0" max="2" step="0.1" placeholder="auto"></label>
           <button type="button" class="ghost" id="clear-btn">New chat</button>
           <button type="submit" class="primary" id="send-btn" disabled>Send</button>
         </div>

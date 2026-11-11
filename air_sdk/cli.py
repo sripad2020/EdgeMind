@@ -3,7 +3,9 @@
     air-sdk doctor                         check your setup
     air-sdk models                         list installed models (and which fit in memory now)
     air-sdk ask   <model> "question"       one question, streamed answer
-    air-sdk chat  <model>                  interactive chat (/summary, /reset, /bye)
+                  [--skill sql --context "CREATE TABLE ..."]   checked answer, auto-escalation
+    air-sdk chat  <model>                  chat with sectioned memory (/sections, /skill, /bye)
+    air-sdk skills <model>                 skills and their pass/fail evidence
     air-sdk pull  <model>                  download a model (Ollama name or hf.co/...)
     air-sdk import <file.gguf> [--name n]  use a local GGUF file
     air-sdk faster <model>                 create Q8_0/Q4_0 versions + measure their quality
@@ -40,7 +42,15 @@ def _add_load_options(p: argparse.ArgumentParser) -> None:
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "gpu"])
     p.add_argument("--max-context", type=int, default=4096)
     p.add_argument("--max-tokens", type=int, default=512)
-    p.add_argument("--temperature", type=float, default=0.7)
+    p.add_argument("--temperature", type=float, default=None,
+                   help="sampling temperature (default: the skill's recommended value)")
+    p.add_argument("--skill", default=None,
+                   help="task: auto (default: detected per message), general, sql, python, "
+                        "json, math, summarise (verified skills check each answer and retry "
+                        "on a more accurate precision if needed)")
+    p.add_argument("--context", default=None,
+                   help="what the skill checks against: SQL schema, required JSON keys, or "
+                        "the expected number for math")
     p.add_argument("--no-learn", action="store_true", help="turn reinforcement learning off")
     p.add_argument("--no-speed-test", action="store_true", help="skip the quick speed test")
     p.add_argument("--pull", action="store_true", help="download the model if missing")
@@ -61,23 +71,62 @@ def _load(args: argparse.Namespace) -> LLM:
     return llm
 
 
+def _check_line(llm: LLM) -> str:
+    r = llm.last
+    if r is None:
+        return ""
+    if r.verified is None:
+        check = "no automatic check"
+    else:
+        check = f"check {'PASSED' if r.verified else 'FAILED'}: {r.check}"
+        if r.escalated:
+            check += " (after " + " -> ".join(a[0] for a in r.attempts) + ")"
+    task = f"{r.skill}{' (detected)' if r.auto else ''}"
+    section = f"Section: {r.section} | " if r.section else ""
+    notice = f"\n[{r.notice}]" if r.notice else ""
+    return (f"[{section}{task} | {check} | {r.tokens_per_second:.1f} tok/s, "
+            f"{r.precision} on {r.device}]{notice}")
+
+
 def _cmd_ask(args: argparse.Namespace) -> int:
     with _load(args) as llm:
-        for piece in llm.stream(args.prompt, max_tokens=args.max_tokens,
-                                temperature=args.temperature):
+        for piece in llm.stream(args.prompt, skill=args.skill, context=args.context,
+                                max_tokens=args.max_tokens, temperature=args.temperature):
             print(piece, end="", flush=True)
         print()
-        if llm.last is not None:
-            r = llm.last
-            print(f"\n[{r.tokens_per_second:.1f} tok/s, first word {r.time_to_first_token_s:.2f}s,"
-                  f" {r.precision} on {r.device}]", file=sys.stderr)
+        print("\n" + _check_line(llm), file=sys.stderr)
+        if llm.last is not None and llm.last.verified is False:
+            return 3  # answered, but the answer did not pass its check
+    return 0
+
+
+def _cmd_skills(args: argparse.Namespace) -> int:
+    with load(args.model, speed_test=False, learn=False,
+              reserve_ram_gb=args.reserve_ram_gb) as llm:
+        print(f"Skills for {llm.name} (precisions: {', '.join(llm.model.precision_ladder())})\n")
+        for s in llm.skills():
+            print(f"{s['skill']:10} {s['description']}")
+            if s["verified"]:
+                rows = s["precisions"]
+                evidence = ", ".join(
+                    f"{r['precision']} {r['passes']}/{r['passes'] + r['fails']}"
+                    for r in (rows if isinstance(rows, list) else [])
+                    if r["passes"] + r["fails"]) or "no results yet"
+                print(f"{'':10} starts on {s['starts_on']} · passed checks: {evidence}")
+                if s["context"]:
+                    print(f"{'':10} context: {s['context']}")
+            print()
     return 0
 
 
 def _cmd_chat(args: argparse.Namespace) -> int:
     with _load(args) as llm:
-        chat = llm.conversation(system=args.system)
-        print("Type your message. Commands: /summary  /reset  /bye", file=sys.stderr)
+        if args.skill:
+            llm.use(args.skill)
+        chat = llm.conversation(system=args.system, context=args.context)
+        print("Type your message. Commands: /summary  /sections  /reset  /skill <name|auto>"
+              "  /bye\nTip: 'new task: ...' starts a fresh topic; 'back to ...' returns to one.",
+              file=sys.stderr)
         while True:
             try:
                 text = input("\n>>> ").strip()
@@ -94,11 +143,43 @@ def _cmd_chat(args: argparse.Namespace) -> int:
                 chat.reset()
                 print("(conversation cleared)")
                 continue
+            if text == "/sections":
+                print(_sections_text(chat.sections()))
+                continue
+            if text.startswith("/skill"):
+                name = text.removeprefix("/skill").strip() or None
+                try:
+                    llm.use(name)
+                except AirError as exc:
+                    print(exc)
+                    continue
+                print(f"(skill: {llm.skill})")
+                continue
             for piece in chat.stream(text, max_tokens=args.max_tokens,
                                      temperature=args.temperature):
                 print(piece, end="", flush=True)
             print()
+            print(_check_line(llm), file=sys.stderr)
     return 0
+
+
+def _sections_text(snap: dict[str, object]) -> str:
+    lines = []
+    prefs = snap.get("preferences")
+    if isinstance(prefs, list) and prefs:
+        lines.append("Preferences: " + "; ".join(str(p) for p in prefs))
+    sections = snap.get("sections")
+    for s in sections if isinstance(sections, list) else []:
+        if not isinstance(s, dict):
+            continue
+        lines.append(f"[{s['state']}] {s['title']} ({s['skill']}) - {s['turns']} turns")
+        if s["tables"]:
+            lines.append(f"    tables: {', '.join(s['tables'])} (schema v{s['schema_version']})")
+        if s["definitions"]:
+            lines.append(f"    terms: {', '.join(s['definitions'])}")
+        if s["code_names"]:
+            lines.append(f"    code: {', '.join(s['code_names'])}")
+    return "\n".join(lines) or "(nothing remembered yet)"
 
 
 def _cmd_doctor(_args: argparse.Namespace) -> int:
@@ -205,6 +286,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_load_options(p)
     p.add_argument("--system", default=None, help="system prompt")
     p.set_defaults(func=_cmd_chat)
+    p = sub.add_parser("skills", help="list skills and their pass/fail evidence for a model")
+    p.add_argument("model")
+    p.add_argument("--reserve-ram-gb", type=float, default=None)
+    p.set_defaults(func=_cmd_skills)
     p = sub.add_parser("pull", help="download a model")
     p.add_argument("model")
     p.set_defaults(func=_cmd_pull)

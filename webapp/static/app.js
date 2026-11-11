@@ -3,7 +3,14 @@
 // so model output and server data cannot inject markup or script.
 
 const $ = (id) => document.getElementById(id);
-const state = { history: [], sessionReady: false, busy: false, hasGpu: false };
+const state = { history: [], sessionReady: false, busy: false, hasGpu: false, conversationId: newId() };
+
+// The server keeps this conversation's sectioned memory under this random id.
+function newId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // ---------- helpers ----------
 function el(tag, opts = {}, children = []) {
@@ -169,6 +176,9 @@ function renderProfile(p, variants) {
 
 // ---------- chat ----------
 function resetChat() {
+  const old = state.conversationId;
+  if (state.history.length) fetch(`/api/conversations/${old}`, { method: "DELETE" }).catch(() => {});
+  state.conversationId = newId();
   state.history = [];
   clear($("messages"));
   const empty = el("div", { cls: "empty" }, [
@@ -189,6 +199,44 @@ function addMessage(role, text) {
   $("messages").appendChild(wrap);
   $("messages").scrollTop = $("messages").scrollHeight;
   return { wrap, bubble };
+}
+
+// ---------- verified skills ----------
+const SKILL_CONTEXT = {
+  auto: ["Facts (optional)", "e.g. CREATE TABLE … — remembered for this conversation"],
+  sql: ["Database schema", "CREATE TABLE customers (id INTEGER, name TEXT, city TEXT); …"],
+  json: ["Required keys", "name, age, email   (or an example JSON object)"],
+  math: ["Expected answer (optional)", "e.g. 391"],
+};
+
+function updateSkillContext() {
+  const info = SKILL_CONTEXT[$("skill").value];
+  $("ctx-wrap").hidden = !info;
+  if (info) {
+    $("ctx-label").textContent = info[0];
+    $("skill-context").placeholder = info[1];
+  }
+}
+
+function skillChips(s) {
+  const chips = el("div", { cls: "chips" });
+  if (s.verified === true) chips.appendChild(chip(`✓ ${s.name} check passed`, "good"));
+  else if (s.verified === false) chips.appendChild(chip(`✗ ${s.name} check failed: ${s.check}`, "bad"));
+  else chips.appendChild(chip(`${s.name} (no automatic check)`));
+  if (s.escalated) chips.appendChild(chip(`path: ${s.attempts.map((a) => `${a.precision}${a.ok ? " ✓" : " ✗"}`).join(" → ")}`, "warn"));
+  return chips;
+}
+
+function contextChips(ctx, skill) {
+  const chips = el("div", { cls: "chips" });
+  chips.appendChild(chip(`Section: ${ctx.section}`, "strong"));
+  chips.appendChild(chip(`task ${skill.name}${skill.auto ? " (detected)" : ""} · ${ctx.route}`));
+  const b = ctx.budget;
+  chips.appendChild(chip(`${b.facts_sent} facts · ${b.turns_sent} turns · ~${b.prompt_tokens}/${b.budget} tokens`));
+  if (b.rung !== "full") chips.appendChild(chip(`memory trimmed: ${b.rung}`, "warn"));
+  if (ctx.correction) chips.appendChild(chip("correction noted", "warn"));
+  if (b.notice) chips.appendChild(chip(b.notice, "bad"));
+  return chips;
 }
 
 function metricChips(m) {
@@ -226,9 +274,14 @@ async function sendMessage(ev) {
     const res = await fetch("/api/chat", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        messages: state.history,
+        // The server remembers the conversation (by id): send only the new message.
+        messages: [{ role: "user", content: text }],
+        conversation_id: state.conversationId,
         max_tokens: parseInt($("max_tokens").value, 10) || 512,
-        temperature: Math.max(0, Math.min(2, parseFloat($("temperature").value) || 0)),
+        temperature: $("temperature").value === "" ? null
+          : Math.max(0, Math.min(2, parseFloat($("temperature").value) || 0)),
+        skill: $("skill").value,
+        context: $("skill-context").value.trim() || null,
       }),
     });
     if (!res.ok || !res.body) {
@@ -256,8 +309,18 @@ async function sendMessage(ev) {
           $("messages").scrollTop = $("messages").scrollHeight;
         } else if (evName === "reset") {
           answer = ""; bubble.textContent = "";
+        } else if (evName === "escalate") {
+          // The answer failed its check: discard it and show what happens next.
+          answer = "";
+          bubble.textContent = "";
+          wrap.insertBefore(el("div", { cls: "chips" }, [
+            chip(`check failed on ${data.from}: ${data.why}`, "bad"),
+            chip(`retrying on ${data.to}`, "warn"),
+          ]), bubble);
         } else if (evName === "done") {
           answer = data.text; bubble.textContent = answer;
+          if (data.context) wrap.appendChild(contextChips(data.context, data.skill));
+          if (data.skill && (data.skill.name !== "general" || data.skill.verified !== null)) wrap.appendChild(skillChips(data.skill));
           wrap.appendChild(metricChips(data.metrics));
           renderLastMetrics(data.metrics);
           finished = true;
@@ -593,6 +656,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("quantize-btn").addEventListener("click", runQuantize);
   $("quality-btn").addEventListener("click", runQuality);
   $("pull-btn").addEventListener("click", pullModel);
+  $("skill").addEventListener("change", updateSkillContext);
+  updateSkillContext();
   $("pull-name").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); pullModel(); } });
   $("rl_enabled").addEventListener("change", pushLearningFlags);
   $("auto_adapt").addEventListener("change", pushLearningFlags);

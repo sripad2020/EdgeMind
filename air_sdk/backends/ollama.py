@@ -320,15 +320,28 @@ class OllamaClient:
         return digest
 
     def create_model(
-        self, name: str, *, gguf_digest: str, filename: str, settings: dict[str, object]
+        self, name: str, *, gguf_digest: str, filename: str, settings: dict[str, object],
+        adapters: dict[str, str] | None = None,
     ) -> None:
+        """Create a model from an uploaded GGUF blob, optionally with LoRA adapter blobs
+        (``{filename: digest}``) applied on top of it."""
         name = validate_model_name(name)
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}", gguf_digest):
+        digests = [gguf_digest, *(adapters or {}).values()]
+        if not all(re.fullmatch(r"sha256:[0-9a-f]{64}", d) for d in digests):
             raise ValidationError("invalid blob digest")
         payload: dict[str, object] = {
             "model": name, "files": {filename: gguf_digest}, "stream": False, **settings,
         }
+        if adapters:
+            payload["adapters"] = dict(adapters)
         self.post_json("/api/create", payload)
+
+    def delete_model(self, name: str) -> None:
+        """Remove a model from Ollama (its blobs are freed when no other model uses them)."""
+        resp = self._http.request("DELETE", "/api/delete",
+                                  json={"model": validate_model_name(name)})
+        if resp.status_code >= 400:
+            raise self._error(resp)
 
     def running(self) -> list[RunningModel]:
         models = self.get_json("/api/ps").get("models")

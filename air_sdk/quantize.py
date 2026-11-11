@@ -295,8 +295,13 @@ def quantize_gguf(
     target: QuantTarget,
     *,
     progress: Callable[[int, int], None] | None = None,
+    override: Callable[[TensorInfo, QuantTarget], QuantTarget] | None = None,
 ) -> ModelProfile:
-    """Write ``dst`` as a ``target``-quantized copy of ``src``. Returns the new profile."""
+    """Write ``dst`` as a ``target``-quantized copy of ``src``. Returns the new profile.
+
+    ``override(tensor, default)`` may pick a different precision per quantizable tensor
+    (mixed precision, e.g. keep some layers at Q8_0 in an otherwise Q4_0 file). Tensors
+    that cannot be quantized (norms, 1-D) are always copied unchanged."""
     if not isinstance(target, QuantTarget):
         raise ValidationError("target must be a QuantTarget")
     gguf = read_gguf(src)
@@ -320,7 +325,14 @@ def quantize_gguf(
         kv_parts.append(_encode_u32_kv("general.file_type", target.file_type))
 
     align = gguf.alignment
-    plan = [(t, _tensor_target(t, target)) for t in gguf.tensors]
+    plan: _Plan = []
+    for t in gguf.tensors:
+        tt = _tensor_target(t, target)
+        if tt is not None and override is not None:
+            tt = override(t, tt)
+            if not isinstance(tt, QuantTarget):
+                raise ValidationError("override must return a QuantTarget")
+        plan.append((t, tt))
     offsets: list[int] = []
     cursor = 0
     for t, tt in plan:

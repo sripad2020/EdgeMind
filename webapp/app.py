@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Query, Request, Response
+from fastapi import Path as FastApiPath
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,7 @@ from .service import BusyError, ChatService, NoSessionError, SessionSettings
 
 STATIC_DIR = Path(__file__).parent / "static"
 _MODEL_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._\-/]{0,150}(:[A-Za-z0-9._\-]{1,80})?$"
+_CONVERSATION_PATTERN = r"^[A-Za-z0-9_-]{8,64}$"
 
 
 # ---- request schemas -------------------------------------------------------------------------
@@ -50,7 +52,11 @@ class MessageIn(_Strict):
 class ChatIn(_Strict):
     messages: Annotated[list[MessageIn], Field(min_length=1, max_length=200)]
     max_tokens: Annotated[int, Field(ge=1, le=4096)] = 512
-    temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.7
+    temperature: Annotated[float, Field(ge=0.0, le=2.0)] | None = None
+    skill: Literal["auto", "general", "sql", "python", "json", "math", "summarise"] = "auto"
+    context: Annotated[str, Field(max_length=20_000)] | None = None
+    # Client-chosen id: the server keeps this conversation's sectioned memory.
+    conversation_id: Annotated[str, Field(pattern=_CONVERSATION_PATTERN)] | None = None
 
 
 class QuantizeIn(_Strict):
@@ -186,6 +192,10 @@ def _install_api(app: FastAPI, service: ChatService) -> None:
     async def quality(body: QuantizeIn) -> dict[str, object]:
         return await asyncio.to_thread(service.evaluate_quality, body.model)
 
+    @app.get("/api/skills")
+    async def skills() -> dict[str, object]:
+        return {"skills": await asyncio.to_thread(service.skills)}
+
     @app.get("/api/status")
     async def status() -> dict[str, object]:
         return {"busy": service.is_busy()}
@@ -193,12 +203,28 @@ def _install_api(app: FastAPI, service: ChatService) -> None:
     @app.post("/api/chat")
     async def chat(body: ChatIn) -> StreamingResponse:
         """Server-Sent Events: ``token`` (text piece), ``reset`` (rollback: discard partial
-        answer), ``done`` (final text + metrics), ``error``."""
+        answer), ``escalate`` (check failed, retrying), ``done`` (final text, metrics, skill
+        check and context: section, detected task, budget), ``error``."""
         return _event_stream(lambda emit: service.chat(
             [m.model_dump() for m in body.messages],
             max_tokens=body.max_tokens, temperature=body.temperature,
+            skill=body.skill, context=body.context, conversation_id=body.conversation_id,
             on_token=lambda t: emit("token", t), on_reset=lambda: emit("reset", None),
+            on_escalate=lambda a, b, why: emit("escalate", {"from": a, "to": b, "why": why}),
         ))
+
+    @app.get("/api/conversations/{conversation_id}")
+    async def conversation_memory(
+        conversation_id: Annotated[str, FastApiPath(pattern=_CONVERSATION_PATTERN)],
+    ) -> dict[str, object]:
+        """What the server remembers for a conversation: preferences and sections."""
+        return service.conversation_memory(conversation_id)
+
+    @app.delete("/api/conversations/{conversation_id}")
+    async def forget_conversation(
+        conversation_id: Annotated[str, FastApiPath(pattern=_CONVERSATION_PATTERN)],
+    ) -> dict[str, object]:
+        return {"forgotten": service.forget_conversation(conversation_id)}
 
 
 Emit = Callable[[str, object], None]

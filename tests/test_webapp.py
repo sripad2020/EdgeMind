@@ -71,8 +71,23 @@ def test_quantize_endpoints_validate_model_name(client: TestClient) -> None:
 def test_chat_schema_is_strict(client: TestClient) -> None:
     bad = {"messages": [{"role": "root", "content": "x"}]}
     assert client.post("/api/chat", json=bad).status_code == 422
+    unknown_skill = {"messages": [{"role": "user", "content": "x"}], "skill": "hacking"}
+    assert client.post("/api/chat", json=unknown_skill).status_code == 422
+    huge_ctx = {"messages": [{"role": "user", "content": "x"}], "skill": "sql",
+                "context": "x" * 20_001}
+    assert client.post("/api/chat", json=huge_ctx).status_code == 422
     too_long = {"messages": [{"role": "user", "content": "x" * 40_000}]}
     assert client.post("/api/chat", json=too_long).status_code == 422
+    bad_id = {"messages": [{"role": "user", "content": "x"}], "conversation_id": "../x"}
+    assert client.post("/api/chat", json=bad_id).status_code == 422
+
+
+def test_conversation_memory_endpoints(client: TestClient) -> None:
+    assert client.get("/api/conversations/short").status_code == 422
+    r = client.get("/api/conversations/abcdef0123456789")
+    assert r.status_code == 200
+    assert r.json()["sections"] == []
+    assert client.delete("/api/conversations/abcdef0123456789").json() == {"forgotten": True}
 
 
 def _ollama_has(model: str) -> bool:

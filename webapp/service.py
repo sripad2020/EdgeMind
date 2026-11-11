@@ -8,6 +8,8 @@ from pathlib import Path
 
 from air_sdk import AdaptiveModel, AdaptiveRuntime, AirError, ValidationError
 from air_sdk.backends.ollama import OllamaModelInfo
+from air_sdk.context import AUTO, ContextEngine, SessionMemory, SessionStore
+from air_sdk.skills import SkillEngine
 
 _MODELS_TTL_S = 30.0
 
@@ -44,6 +46,8 @@ class ChatService:
         self._model: AdaptiveModel | None = None
         self._settings: SessionSettings | None = None
         self._models_cache: tuple[float, list[OllamaModelInfo]] | None = None
+        self._sessions = SessionStore()  # per-conversation sectioned memory
+        self._context = ContextEngine()
 
     # ---- lifecycle --------------------------------------------------------------------------
 
@@ -220,20 +224,74 @@ class ChatService:
         messages: list[dict[str, object]],
         *,
         max_tokens: int,
-        temperature: float,
+        temperature: float | None,
         on_token: Callable[[str], None],
         on_reset: Callable[[], None],
+        skill: str = AUTO,
+        context: str | None = None,
+        on_escalate: Callable[[str, str, str], None] | None = None,
+        conversation_id: str | None = None,
     ) -> dict[str, object]:
+        """One reply to the last user message.
+
+        Context: with a ``conversation_id`` the server keeps that conversation's sectioned
+        memory (facts per task, routing, token budget); otherwise the memory is rebuilt from
+        the ``messages`` sent. The task is detected unless ``skill`` names one; verified
+        skills check the answer against the full stored facts and retry on a more accurate
+        precision if the check fails."""
+        system = next((str(m["content"]) for m in messages if m.get("role") == "system"), None)
+        last = messages[-1]
+        if last.get("role") != "user" or not isinstance(last.get("content"), str):
+            raise ValidationError("the last message must be the user's")
+        text = str(last["content"])
         if not self._busy.acquire(blocking=False):
             raise BusyError("a generation is already in progress")
         try:
             with self._lock:
                 model = self._require_model()
-            r = model.chat(messages, max_tokens=max_tokens, temperature=temperature,
-                           on_token=on_token, on_reset=on_reset)
-            return {"text": r.text, "metrics": r.as_dict()}
+                rt = self._runtime_for(self._objective or "balanced")
+            if conversation_id is not None:
+                memory = self._sessions.get(conversation_id)
+            else:
+                memory = SessionMemory()
+                self._context.replay(memory, [m for m in messages[:-1]
+                                              if m.get("role") != "system"])
+            engine = SkillEngine(model, rt.store)
+            with memory.lock:
+                p = self._context.prepare(memory, text, skill=skill, context=context,
+                                          system=system, context_limit=model.context_limit,
+                                          max_tokens=max_tokens)
+                out = engine.run(
+                    p.messages, p.skill, context=p.prompt_context,
+                    check_context=p.check_context, bonus=True, bonus_schema=p.bonus_schema,
+                    max_tokens=max_tokens, temperature=temperature, on_token=on_token,
+                    on_reset=on_reset, on_escalate=on_escalate)
+                self._context.commit(memory, p, out.response.text)
+            return {
+                "text": out.response.text,
+                "metrics": out.response.as_dict(),
+                "skill": {
+                    "name": out.skill, "verified": out.verified, "escalated": out.escalated,
+                    "check": out.detail, "auto": p.auto,
+                    "attempts": [{"precision": a.precision, "ok": a.ok, "detail": a.detail}
+                                 for a in out.attempts],
+                },
+                "context": p.as_dict(),
+            }
         finally:
             self._busy.release()
+
+    def conversation_memory(self, conversation_id: str) -> dict[str, object]:
+        return self._sessions.get(conversation_id).snapshot()
+
+    def forget_conversation(self, conversation_id: str) -> bool:
+        return self._sessions.drop(conversation_id)
+
+    def skills(self) -> list[dict[str, object]]:
+        with self._lock:
+            model = self._require_model()
+            rt = self._runtime_for(self._objective or "balanced")
+            return SkillEngine(model, rt.store).catalogue()
 
     # ---- reports ----------------------------------------------------------------------------
 

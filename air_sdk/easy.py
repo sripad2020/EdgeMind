@@ -33,7 +33,7 @@ import queue
 import shutil
 import sys
 import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -46,6 +46,7 @@ from ._validate import GiB, require_bool, require_enum, require_float, require_i
 from .analysis.profile import analyze_model
 from .backends.ollama import DEFAULT_BASE_URL, OllamaClient, OllamaError
 from .config import Objective, SafetyPolicy
+from .context import AUTO, ContextEngine, Prepared, SessionMemory, is_auto
 from .errors import (
     AirError,
     InsufficientResourcesError,
@@ -55,6 +56,7 @@ from .errors import (
 )
 from .hardware.profiler import profile_hardware
 from .runtime import AdaptiveModel, AdaptiveRuntime, GenerationResponse
+from .skills import SkillEngine, SkillOutcome, get_skill
 
 __all__ = [
     "LLM",
@@ -117,12 +119,35 @@ class Reply:
     prepared_in_background: bool
     memory_relief: bool
     rolled_back: bool
+    # Verified skills: which task, whether the answer passed its check (None = no check),
+    # whether a more accurate precision was needed, and every attempt (precision, ok, why).
+    skill: str = "general"
+    verified: bool | None = None
+    escalated: bool = False
+    check: str = ""
+    attempts: tuple[tuple[str, bool | None, str], ...] = ()
+    # Context: the task was detected automatically, which section of the conversation
+    # answered, how many stored facts were sent, and a notice if memory had to be cut.
+    auto: bool = False
+    section: str = ""
+    facts_sent: int = 0
+    prompt_tokens: int = 0
+    notice: str = ""
 
     def __str__(self) -> str:
         return self.text
 
+    @property
+    def label(self) -> str:
+        """One line: ``Section: Tables: orders (sql, detected) - check passed``."""
+        how = "detected" if self.auto else "chosen"
+        check = {True: "check passed", False: "check FAILED", None: "no check"}[self.verified]
+        where = f"Section: {self.section} - " if self.section else ""
+        return f"{where}task {self.skill} ({how}) - {check}"
+
     @classmethod
-    def _from(cls, r: GenerationResponse) -> Reply:
+    def _from(cls, r: GenerationResponse, outcome: SkillOutcome | None = None,
+              prepared: Prepared | None = None) -> Reply:
         c = r.config
         return cls(
             text=r.text, tokens=r.completion_tokens, tokens_per_second=r.tokens_per_second,
@@ -131,7 +156,22 @@ class Reply:
             context_tokens=c.n_ctx, action=r.action, explored=r.explored, reward=r.reward,
             prepared_in_background=r.prefetched, memory_relief=r.relief,
             rolled_back=r.rolled_back,
+            skill=outcome.skill if outcome else "general",
+            verified=outcome.verified if outcome else None,
+            escalated=outcome.escalated if outcome else False,
+            check=outcome.detail if outcome else "",
+            attempts=tuple((a.precision, a.ok, a.detail) for a in outcome.attempts)
+            if outcome else (),
+            auto=prepared.auto if prepared else False,
+            section=prepared.section if prepared else "",
+            facts_sent=len(prepared.plan.facts) if prepared else 0,
+            prompt_tokens=prepared.plan.prompt_tokens if prepared else 0,
+            notice=prepared.plan.notice if prepared else "",
         )
+
+
+_RECOVER_NOTICE = "\n[recovering: retrying with a safer configuration]\n"
+_ESCALATE_PREFIX = "\n[check failed"
 
 
 # ---- helpers ----------------------------------------------------------------------------------
@@ -216,14 +256,6 @@ def _fit_hint(client: OllamaClient, safety: SafetyPolicy, message: str) -> str:
             "reserve_ram_gb=...) changes how much RAM is kept free for other programs.")
 
 
-def _messages(prompt: str, system: str | None) -> list[dict[str, object]]:
-    msgs: list[dict[str, object]] = []
-    if system:
-        msgs.append({"role": "system", "content": system})
-    msgs.append({"role": "user", "content": prompt})
-    return msgs
-
-
 # ---- the main object --------------------------------------------------------------------------
 
 
@@ -237,6 +269,9 @@ class LLM:
         self._name = name
         self._settings = settings
         self._lock = threading.Lock()
+        self._skill = AUTO
+        self._engine = SkillEngine(model, runtime.store)
+        self._context = ContextEngine()
         self.last: Reply | None = None
 
     # -- basics --------------------------------------------------------------------------------
@@ -273,45 +308,117 @@ class LLM:
 
     # -- asking --------------------------------------------------------------------------------
 
-    def ask(self, prompt: str, *, system: str | None = None, max_tokens: int = 512,
-            temperature: float = 0.7) -> str:
-        """Ask one question, get the answer text."""
-        return self.reply(prompt, system=system, max_tokens=max_tokens,
-                          temperature=temperature).text
+    def ask(self, prompt: str, *, skill: str | None = None, context: str | None = None,
+            system: str | None = None, max_tokens: int = 512,
+            temperature: float | None = None) -> str:
+        """Ask one question, get the answer text.
 
-    def reply(self, prompt: str, *, system: str | None = None, max_tokens: int = 512,
-              temperature: float = 0.7) -> Reply:
-        """Like :meth:`ask` but returns a :class:`Reply` with speed and decisions."""
-        return self._chat(_messages(prompt, system), max_tokens, temperature)
+        The task is detected automatically (``skill="auto"``, the default): a SQL question
+        is checked against the schema, a calculation against the computed result, and so
+        on. ``skill`` (``"sql"``, ``"python"``, ``"json"``, ``"math"``, ``"summarise"``,
+        ``"general"``) forces one; ``context`` gives facts to use and check against (SQL
+        schema, required JSON keys, expected number).
+        """
+        return self.reply(prompt, skill=skill, context=context, system=system,
+                          max_tokens=max_tokens, temperature=temperature).text
 
-    def stream(self, prompt: str, *, system: str | None = None, max_tokens: int = 512,
-               temperature: float = 0.7) -> Iterator[str]:
+    def reply(self, prompt: str, *, skill: str | None = None, context: str | None = None,
+              system: str | None = None, max_tokens: int = 512,
+              temperature: float | None = None) -> Reply:
+        """Like :meth:`ask` but returns a :class:`Reply` with speed, decisions and checks."""
+        return self._chat(SessionMemory(), prompt, system, max_tokens, temperature,
+                          skill=skill, context=context)
+
+    def stream(self, prompt: str, *, skill: str | None = None, context: str | None = None,
+               system: str | None = None, max_tokens: int = 512,
+               temperature: float | None = None) -> Iterator[str]:
         """Yield the answer piece by piece as it is generated."""
-        return self._stream(_messages(prompt, system), max_tokens, temperature)
+        return self._stream(SessionMemory(), prompt, system, max_tokens, temperature,
+                            skill=skill, context=context)
 
-    def conversation(self, system: str | None = None) -> Conversation:
-        """Start a multi-turn conversation that remembers previous messages."""
-        return Conversation(self, system)
+    def conversation(self, system: str | None = None, *, skill: str | None = None,
+                     context: str | None = None) -> Conversation:
+        """Start a conversation with sectioned memory: each piece of work (a database, a
+        piece of code, a calculation...) keeps its own facts, and only the relevant ones
+        are sent with each message."""
+        if skill is not None and not is_auto(skill):
+            get_skill(skill)  # validate early
+        return Conversation(self, system, skill=skill, context=context)
 
-    def _chat(self, messages: Sequence[dict[str, object]], max_tokens: int,
-              temperature: float) -> Reply:
-        with self._lock:
-            r = self._model.chat(list(messages), max_tokens=max_tokens, temperature=temperature)
-        self.last = Reply._from(r)
-        return self.last
+    # -- skills ----------------------------------------------------------------------------------
 
-    def _stream(self, messages: Sequence[dict[str, object]], max_tokens: int,
-                temperature: float) -> Iterator[str]:
+    def use(self, skill: str | None) -> None:
+        """Set the task for following questions: ``"auto"`` (default: detect per message),
+        ``"sql"``, ``"python"``, ``"json"``, ``"math"``, ``"summarise"`` or ``"general"``.
+        Verified skills answer on the fastest precision, check the answer, and retry on a
+        more accurate precision only if the check fails."""
+        self._skill = AUTO if skill is not None and is_auto(skill) else get_skill(skill).name
+
+    @property
+    def skill(self) -> str:
+        """The active skill (``"auto"`` = detected per message)."""
+        return self._skill
+
+    def skills(self) -> list[dict[str, object]]:
+        """All skills with their check, and per-precision pass/fail evidence for this model."""
+        return self._engine.catalogue()
+
+    def skill_report(self, skill: str | None = None) -> dict[str, object]:
+        """Evidence for one skill (default: the active one): passes and fails per precision,
+        and which precision it will start on next."""
+        name = skill or self._skill
+        if is_auto(name):
+            name = self.last.skill if self.last else "general"
+        return self._engine.report(name)
+
+    # -- internals -------------------------------------------------------------------------------
+
+    def _exchange(self, memory: SessionMemory, text: str, system: str | None,
+                  max_tokens: int, temperature: float | None, *, skill: str | None,
+                  context: str | None, previous: Reply | None = None,
+                  on_token: Callable[[str], None] | None = None,
+                  on_reset: Callable[[], None] | None = None,
+                  on_escalate: Callable[[str, str, str], None] | None = None) -> Reply:
+        """prepare (facts, task, section, budget) -> answer + check -> remember."""
+        max_tokens = require_int("max_tokens", max_tokens, min_value=1, max_value=1 << 16)
+        with memory.lock:
+            p = self._context.prepare(
+                memory, text, skill=skill if skill is not None else self._skill,
+                context=context, system=system, context_limit=self._model.context_limit,
+                max_tokens=max_tokens)
+            with self._lock:
+                if p.correction and previous is not None and previous.verified:
+                    # "That's wrong": a passed check missed it, so count a fail there.
+                    self._engine.record_correction(previous.skill, previous.precision)
+                out = self._engine.run(
+                    p.messages, p.skill, context=p.prompt_context,
+                    check_context=p.check_context, bonus=True, bonus_schema=p.bonus_schema,
+                    max_tokens=max_tokens, temperature=temperature, on_token=on_token,
+                    on_reset=on_reset, on_escalate=on_escalate)
+            self._context.commit(memory, p, out.response.text)
+        reply = Reply._from(out.response, out, p)
+        self.last = reply
+        return reply
+
+    def _chat(self, memory: SessionMemory, text: str, system: str | None, max_tokens: int,
+              temperature: float | None, *, skill: str | None = None,
+              context: str | None = None, previous: Reply | None = None) -> Reply:
+        return self._exchange(memory, text, system, max_tokens, temperature, skill=skill,
+                              context=context, previous=previous)
+
+    def _stream(self, memory: SessionMemory, text: str, system: str | None,
+                max_tokens: int, temperature: float | None, *, skill: str | None = None,
+                context: str | None = None, previous: Reply | None = None) -> Iterator[str]:
         q: queue.Queue[tuple[str, object]] = queue.Queue()
 
         def work() -> None:
             try:
-                with self._lock:
-                    r = self._model.chat(
-                        list(messages), max_tokens=max_tokens, temperature=temperature,
-                        on_token=lambda t: q.put(("token", t)),
-                        on_reset=lambda: q.put(("reset", None)),
-                    )
+                r = self._exchange(
+                    memory, text, system, max_tokens, temperature, skill=skill,
+                    context=context, previous=previous,
+                    on_token=lambda t: q.put(("token", t)),
+                    on_reset=lambda: q.put(("reset", None)),
+                    on_escalate=lambda a, b, why: q.put(("escalate", (a, b, why))))
                 q.put(("done", r))
             except BaseException as exc:  # noqa: BLE001 - re-raised in the caller's thread
                 q.put(("error", exc))
@@ -324,9 +431,11 @@ class LLM:
                 if kind == "token" and isinstance(value, str):
                     yield value
                 elif kind == "reset":
-                    yield "\n[recovering: retrying with a safer configuration]\n"
-                elif kind == "done" and isinstance(value, GenerationResponse):
-                    self.last = Reply._from(value)
+                    yield _RECOVER_NOTICE
+                elif kind == "escalate" and isinstance(value, tuple):
+                    _from, to, why = value
+                    yield f"{_ESCALATE_PREFIX} on {_from}: {why}; retrying on {to}]\n"
+                elif kind == "done" and isinstance(value, Reply):
                     return
                 elif kind == "error" and isinstance(value, BaseException):
                     raise value
@@ -374,6 +483,15 @@ class LLM:
             if isinstance(row, dict):
                 lines.append(f"Speed test : {row['precision']:7} {row['tokens_per_second']} tok/s"
                              f"{'  <- chosen' if row.get('chosen') else ''}")
+        sk = self.skill_report()
+        if is_auto(self._skill):
+            lines.append("Skill      : auto (task detected per message; SQL, Python, JSON and "
+                         "maths answers are checked)")
+        elif sk["verified"]:
+            lines.append(f"Skill      : {self._skill} (checked answers; starts on "
+                         f"{sk['starts_on']}, escalates only if a check fails)")
+        else:
+            lines.append(f"Skill      : {self._skill} (no automatic check)")
         lines += [
             f"Replies    : {perf['requests']}  (avg {perf['mean_tokens_per_second']} tok/s,"
             f" failures {perf['failures']}, memory switches {perf['memory_pressure_reliefs']})",
@@ -411,6 +529,7 @@ class LLM:
     def _reload(self) -> None:
         self._model = self._rt.load_ollama_model(self._name, discover=True)
         self._model.optimize(**self._settings)  # type: ignore[arg-type]
+        self._engine = SkillEngine(self._model, self._rt.store)
 
 
 # ---- conversations ----------------------------------------------------------------------------
@@ -418,43 +537,70 @@ class LLM:
 
 @dataclass
 class Conversation:
-    """A chat that remembers what was said. Create with :meth:`LLM.conversation`."""
+    """A chat with sectioned memory. Create with :meth:`LLM.conversation`.
+
+    Each piece of work (a database, some code, a calculation, ...) gets its own *section*
+    with its own facts (schema, definitions, function names, required keys) and turns.
+    Messages are routed to the right section automatically ("back to the orders query"
+    and "new task: ..." also work); only the active section's relevant facts and recent
+    turns are sent, within a token budget. Answers are checked against the full facts.
+    """
 
     llm: LLM
     system: str | None = None
-    history: list[dict[str, object]] = field(default_factory=list)
-    max_messages: int = 100
+    history: list[dict[str, object]] = field(default_factory=list)  # full transcript
+    max_messages: int = 100  # transcript length kept in ``history``
+    skill: str | None = None  # None = follow the LLM's active skill ("auto" by default)
+    context: str | None = None  # e.g. a SQL schema that applies to the conversation
+    memory: SessionMemory = field(default_factory=SessionMemory)
+    last: Reply | None = None
 
-    def _messages(self, text: str) -> list[dict[str, object]]:
-        msgs: list[dict[str, object]] = []
-        if self.system:
-            msgs.append({"role": "system", "content": self.system})
-        recent = self.history[-(self.max_messages - 1):]
-        return [*msgs, *recent, {"role": "user", "content": text}]
-
-    def say(self, text: str, *, max_tokens: int = 512, temperature: float = 0.7) -> str:
-        """Send a message and get the reply; both are added to the history."""
-        reply = self.llm._chat(self._messages(text), max_tokens, temperature)
+    def _record(self, text: str, answer: str) -> None:
         self.history += [{"role": "user", "content": text},
-                         {"role": "assistant", "content": reply.text}]
-        return reply.text
+                         {"role": "assistant", "content": answer}]
+        del self.history[:-self.max_messages]
+
+    def say(self, text: str, *, max_tokens: int = 512,
+            temperature: float | None = None) -> str:
+        """Send a message and get the reply."""
+        return self.reply(text, max_tokens=max_tokens, temperature=temperature).text
+
+    def reply(self, text: str, *, max_tokens: int = 512,
+              temperature: float | None = None) -> Reply:
+        """Like :meth:`say` but returns the :class:`Reply` (with ``section`` and checks)."""
+        r = self.llm._chat(self.memory, text, self.system, max_tokens, temperature,
+                           skill=self.skill, context=self.context, previous=self.last)
+        self.last = r
+        self._record(text, r.text)
+        return r
 
     def stream(self, text: str, *, max_tokens: int = 512,
-               temperature: float = 0.7) -> Iterator[str]:
+               temperature: float | None = None) -> Iterator[str]:
         """Like :meth:`say` but yields the reply piece by piece."""
-        pieces: list[str] = []
-        for piece in self.llm._stream(self._messages(text), max_tokens, temperature):
-            if piece.startswith("\n[recovering"):
-                pieces.clear()
-            else:
-                pieces.append(piece)
-            yield piece
-        self.history += [{"role": "user", "content": text},
-                         {"role": "assistant", "content": "".join(pieces)}]
+        yield from self.llm._stream(self.memory, text, self.system, max_tokens, temperature,
+                                    skill=self.skill, context=self.context,
+                                    previous=self.last)
+        self.last = self.llm.last
+        if self.last is not None:
+            self._record(text, self.last.text)
+
+    @property
+    def section(self) -> str:
+        """Label of the active section ("" before the first message)."""
+        with self.memory.lock:
+            s = self.memory.sections.get(self.memory.active) \
+                if self.memory.active is not None else None
+            return s.label if s else ""
+
+    def sections(self) -> dict[str, object]:
+        """What the conversation remembers: preferences and every section's facts."""
+        return self.memory.snapshot()
 
     def reset(self) -> None:
         """Forget the conversation (keeps the system message)."""
         self.history.clear()
+        self.memory.forget()
+        self.last = None
 
 
 # ---- load ---------------------------------------------------------------------------------------

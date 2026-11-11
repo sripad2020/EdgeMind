@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS experience (
 );
 CREATE INDEX IF NOT EXISTS idx_exp_ctx_id ON experience(context, id);
 CREATE INDEX IF NOT EXISTS idx_exp_ctx_cfg ON experience(context, config_key);
+CREATE TABLE IF NOT EXISTS skill_results (
+    family TEXT NOT NULL, skill TEXT NOT NULL, precision TEXT NOT NULL,
+    passes INTEGER NOT NULL, fails INTEGER NOT NULL, updated REAL NOT NULL,
+    PRIMARY KEY (family, skill, precision)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS quality (
     variant_key TEXT PRIMARY KEY, reference_key TEXT NOT NULL, agreement REAL NOT NULL,
     measured_loss REAL NOT NULL, prompts INTEGER NOT NULL, updated REAL NOT NULL
@@ -318,6 +323,34 @@ class ExperienceStore:
             m = _finite_or_none(mean)
             if isinstance(key, str) and m is not None and isinstance(count, int) and count > 0:
                 out.append(ConfigScore(key, m, count))
+        return out
+
+    # ---- verified skills ----------------------------------------------------------------------
+
+    @_locked
+    def record_skill_result(self, family: str, skill: str, precision: str, ok: bool) -> None:
+        """Count one verified (ok) or failed check for a model family / skill / precision."""
+        with self._tx() as db:
+            db.execute(
+                "INSERT INTO skill_results (family, skill, precision, passes, fails, updated)"
+                " VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(family, skill, precision) DO UPDATE"
+                " SET passes = passes + excluded.passes, fails = fails + excluded.fails,"
+                " updated = excluded.updated",
+                (family, skill[:64], precision[:32], int(ok), int(not ok), time.time()),
+            )
+
+    @_locked
+    def skill_results(self, family: str, skill: str) -> dict[str, tuple[int, int]]:
+        """precision -> (passes, fails); corrupt rows are ignored."""
+        rows = self._db.execute(
+            "SELECT precision, passes, fails FROM skill_results WHERE family = ? AND skill = ?",
+            (family, skill),
+        ).fetchall()
+        out: dict[str, tuple[int, int]] = {}
+        for prec, passes, fails in rows:
+            if (isinstance(prec, str) and isinstance(passes, int) and isinstance(fails, int)
+                    and not isinstance(passes, bool) and passes >= 0 and fails >= 0):
+                out[prec] = (passes, fails)
         return out
 
     # ---- measured quality ---------------------------------------------------------------------
